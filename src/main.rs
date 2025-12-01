@@ -5,14 +5,13 @@ mod pacman;
 mod git_ops;
 mod parser;
 mod dependency;
+mod resolver;
 
 use anyhow::Result;
 use args::{Cli, Commands};
 use clap::Parser;
 use colored::*;
-use std::{ env, path::Path };
-use crate::git_ops::clone_repo;
-use crate::parser::parse_srcinfo;
+use std::{ env, process::Command };
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -63,48 +62,56 @@ async fn main() -> Result<()> {
                 println!("No packages found for '{}'", query);
             }
         }
-        Commands::Get { package} => {
-            let home = env::var("HOME").expect("Could not find HOME");
-            let cache_dir = format!("{}/.cache/raur/{}", home, package);
-            let aur_url = format!("https://aur.archlinux.org/{}.git", package);
-            let path = Path::new(&cache_dir);
+        Commands::Get { package } => {
+            let mut visited = Vec::new();
+            let mut build_queue = Vec::new();
+            let mut repo_queue = Vec::new();
 
-            if path.exists() {
-                eprintln!("!! Directory exists. (Pull logic goes here later)");
-                return Ok(());
+            println!(":: Calculating dependency tree...");
+
+            resolver::resolve_tree(&package, &mut visited, &mut build_queue, &mut repo_queue);
+
+            if !repo_queue.is_empty() {
+                println!("\n:: Installing {} official dependencies...", repo_queue.len());
+                println!(":: Targets: {:?}", repo_queue);
+
+                let mut pacman_cmd = Command::new("sudo");
+                pacman_cmd.arg("pacman").arg("-S").arg("--needed");
+
+                for dep in repo_queue {
+                    pacman_cmd.arg(dep);
+                }
+
+                let status = pacman_cmd.status().expect("Failed to run pacman");
+
+                if !status.success() {
+                    eprintln!("!! Failed to install dependencies. Aborting.");
+                    return Ok(());
+                }
+            } else {
+                println!("\n:: No official dependencies to install.");
             }
 
-            match clone_repo(&aur_url, path) {
-                Ok(_) => {
-                    println!(":: Package ready in {}", cache_dir);
-                    match parse_srcinfo(path){
-                        Ok(meta) => {
-                            println!(":: Package: {} v{}", meta.pkgbase, meta.version);
+            println!("\n:: Starting AUR build process for {} packages...", build_queue.len());
 
-                            let mut repo_deps: Vec<String> = Vec::new();
-                            let mut aur_deps: Vec<String> = Vec::new();
+            for pkg in build_queue {
+                let home = env::var("HOME").expect("No HOME");
+                let cache_dir = format!("{}/.cache/raur/{}", home, pkg);
 
-                            println!(":: Resolving dependencies...");
+                println!(":: Building {}...", pkg);
 
-                            for dep in &meta.depends{
-                                let clean_name = dependency::clean_dependency(dep);
+                let status = Command::new("makepkg")
+                    .arg("-si")
+                    .current_dir(&cache_dir)
+                    .status();
 
-                                match dependency::check_origin(&clean_name) {
-                                    dependency::PackageOrigin::Repo => repo_deps.push(clean_name),
-                                    dependency::PackageOrigin::Aur => aur_deps.push(clean_name),
-                                }
-                            }
-
-                            if !repo_deps.is_empty() {println!(":: [PACMAN] These can be installed instantly: {:?}", repo_deps);
-                            }
-                            if !aur_deps.is_empty() {
-                                println!(":: [AUR]    These need to be built: {:?}", aur_deps);
-                            }
-                        }
-                        Err(e) => eprintln!("!! Failed to read .SRCINFO: {}", e),
+                match status {
+                    Ok(s) if s.success() => println!(":: {} installed successfully!", pkg),
+                    _ => {
+                        eprintln!("!! Failed to build {}. Aborting queue.", pkg);
+                        break;
                     }
-                },
-                Err(e) => eprintln!("!! Failed to clone: {}", e),
+                }
             }
         }
     }

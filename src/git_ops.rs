@@ -53,3 +53,18 @@ pub fn clone_repo(url: &str, path: &Path) -> Result<(), git2::Error> {
         Err(e) => Err(e),
     }
 }
+
+// Yup cheating here a little >.<
+pub fn pull_repo(path: &Path) -> Result<(), git2::Error> {
+    println!(":: Checking for updates in {:?}...", path);
+
+    let status = std::process::Command::new("git")
+        .current_dir(path)
+        .arg("pull")
+        .output();
+
+    match status {
+        Ok(s) if s.status.success() => Ok(()),
+        _ => Err(git2::Error::from_str("Git pull failed")),
+    }
+}
