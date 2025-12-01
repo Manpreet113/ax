@@ -35,6 +35,8 @@ pub fn resolve_tree(pkg: &str, visited: &mut Vec<String>, build_queue: &mut Vec<
         }
     };
 
+    crate::gpg::ensure_keys(&meta.validpgpkeys);
+
     println!(":: Analyzing {} dependencies...", meta.depends.len());
 
     let status = dependency::classify_dependencies(meta.depends);

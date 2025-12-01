@@ -8,6 +8,7 @@ pub struct PackageMetaData {
     pub version: String,
     pub depends: Vec<String>,
     pub make_depends: Vec<String>,
+    pub validpgpkeys: Vec<String>,
 }
 
 pub fn parse_srcinfo(path: &Path) -> io::Result<PackageMetaData> {
@@ -36,6 +37,7 @@ pub fn parse_srcinfo(path: &Path) -> io::Result<PackageMetaData> {
                 "pkgver" => metadata.version = value,
                 "depends" => metadata.depends.push(value),
                 "makedepends" => metadata.make_depends.push(value),
+                "validpgpkeys" => metadata.validpgpkeys.push(value),
                 // We ignore keys we don't care about (like 'arch', 'license')
                 _ => {}
             }

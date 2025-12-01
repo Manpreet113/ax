@@ -6,6 +6,7 @@ mod git_ops;
 mod parser;
 mod dependency;
 mod resolver;
+mod gpg;
 
 use anyhow::Result;
 use args::{Cli, Commands};
