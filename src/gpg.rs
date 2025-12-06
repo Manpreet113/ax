@@ -1,4 +1,5 @@
 use std::process::{Command, Stdio};
+use colored::*;
 
 pub fn ensure_keys(keys: &[String]) {
     if keys.is_empty() {
@@ -16,10 +17,8 @@ pub fn ensure_keys(keys: &[String]) {
             .status()
             .expect("Failed to check gpg");
 
-        if status.success() {
-            println!("   -> Key {} is already known.", key);
-        } else {
-            println!("   -> Key {} missing. Fetching...", key);
+        if !status.success() {
+            println!("   -> Key {} missing. Fetching...", key.yellow());
 
             let fetch_status = Command::new("gpg")
                 .arg("--recv-keys")
@@ -28,7 +27,7 @@ pub fn ensure_keys(keys: &[String]) {
                 .expect("Failed to run gpg recv-keys");
 
             if !fetch_status.success() {
-                eprintln!("!! Warning: Failed to import key {}. Build might fail.", key);
+                eprintln!("!! Warning: Failed to import key {}. Build might fail.", key.red());
             }
         }
     }
