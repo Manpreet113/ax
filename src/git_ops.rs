@@ -21,7 +21,7 @@ pub fn clone_repo(url: &str, path: &Path) -> Result<()> {
 }
 
 pub fn pull_repo(path: &Path) -> Result<()> {
-    // We use Command for pull because libgit2 merge logic is complex
+    // We use Command for pull because libgit2 merge logic is complex and I am simple.
     let status = std::process::Command::new("git")
         .current_dir(path)
         .arg("pull")
@@ -32,4 +32,44 @@ pub fn pull_repo(path: &Path) -> Result<()> {
     } else {
         anyhow::bail!("Git pull failed")
     }
+}
+
+pub fn get_diff(path: &Path) -> Result<String> {
+    // Show diff between HEAD and the upstream we just fetched
+    // Usually 'git diff HEAD..FETCH_HEAD' works after a fetch
+    let status = std::process::Command::new("git")
+        .current_dir(path)
+        .args(&["diff", "HEAD..FETCH_HEAD", "--color=always"])
+        .output()?;
+
+    Ok(String::from_utf8_lossy(&status.stdout).to_string())
+}
+
+pub fn check_vcs_update(path: &Path) -> Result<bool> {
+    // 1. Fetch
+    let status = std::process::Command::new("git")
+        .current_dir(path)
+        .arg("fetch")
+        .output()?;
+
+    if !status.status.success() {
+        return Ok(false); // If fetch fails, assume no update or offline
+    }
+
+    // 2. Compare HEAD and @{upstream}
+    let output = std::process::Command::new("git")
+        .current_dir(path)
+        .args(&["rev-list", "--left-right", "--count", "HEAD...@{u}"])
+        .output()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Output format: "0 5" (0 ahead, 5 behind)
+    let parts: Vec<&str> = stdout.split_whitespace().collect();
+    
+    if parts.len() >= 2 {
+        let behind: usize = parts[1].parse().unwrap_or(0);
+        return Ok(behind > 0);
+    }
+
+    Ok(false)
 }

@@ -7,6 +7,13 @@ pub struct ArchDB {
     handle: Arc<Alpm>,
 }
 
+pub struct RepoPackage {
+    pub name: String,
+    pub version: String,
+    pub description: Option<String>,
+    pub db: String,
+}
+
 impl ArchDB {
     pub fn new() -> Result<Self> {
         let handle = Alpm::new("/", "/var/lib/pacman")?;
@@ -36,5 +43,52 @@ impl ArchDB {
             }
         }
         false
+    }
+
+    pub fn search(&self, query: &str) -> Result<Vec<RepoPackage>> {
+        let mut results = Vec::new();
+        let dbs = self.handle.syncdbs();
+        
+        for db in dbs {
+            let pkgs = db.search([query].iter())?;
+            for pkg in pkgs {
+                results.push(RepoPackage {
+                    name: pkg.name().to_string(),
+                    version: pkg.version().to_string(),
+                    description: pkg.desc().map(|s| s.to_string()),
+                    db: db.name().to_string(),
+                });
+            }
+        }
+        Ok(results)
+    }
+
+    pub fn get_foreign_packages(&self) -> Result<Vec<RepoPackage>> {
+        let local_db = self.handle.localdb();
+        let sync_dbs = self.handle.syncdbs();
+        let mut foreign_pkgs = Vec::new();
+
+        for pkg in local_db.pkgs() {
+            let pkg_name = pkg.name();
+            let mut found = false;
+
+            for db in sync_dbs {
+                if db.pkg(pkg_name).is_ok() {
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                foreign_pkgs.push(RepoPackage {
+                    name: pkg.name().to_string(),
+                    version: pkg.version().to_string(),
+                    description: pkg.desc().map(|s| s.to_string()),
+                    db: "local".to_string(),
+                });
+            }
+        }
+
+        Ok(foreign_pkgs)
     }
 }
