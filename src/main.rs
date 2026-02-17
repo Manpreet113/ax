@@ -215,85 +215,15 @@ async fn install_packages(
         );
 
         for pkgbase in build_queue {
-            builder::build_package(&pkgbase, config, config.diff_viewer)?;
+            // build_package now returns the exact paths of packages to install
+            let package_paths = builder::build_package(&pkgbase, config, config.diff_viewer)?;
 
-            // Post-build: Identify which .pkg.tar.zst files to install.
-            // We want to install files that match:
-            // 1. The requested 'pkg' (if it was a sub-package of this base)
-            // 2. Any dependencies of requested packages that are provided by this base.
+            // Install the built packages using exact paths from makepkg --packagelist
 
-            // For now, a simple heuristic:
-            // If the user requested 'gcc-libs', and we built 'gcc', we look for 'gcc-libs-*.pkg.tar.zst'.
-            // If the user requested 'gcc', we look for 'gcc-*.pkg.tar.zst'.
-
-            // To do this robustly, we need to know WHICH packages from this base are actually needed.
-            // Our 'repo_queue' tracks repo deps, but 'build_queue' just tracks bases.
-            // 'packages' arg contains the root requests.
-            // We might need to track "aur_deps" separately.
-
-            // FOR PHASE 6 MVP:
-            // We will list ALL .pkg.tar.zst files in the cache dir.
-            // We will filter them: if the filename starts with any string in `visited` (which contains all resolved nodes),
-            // we install it.
-
-            let cache_base = if let Some(ref dir) = config.build_dir {
-                std::path::PathBuf::from(dir)
-            } else if let Some(proj_dirs) =
-                directories::ProjectDirs::from("com", "manpreet113", "ax")
-            {
-                proj_dirs.cache_dir().to_path_buf()
-            } else {
-                std::env::var("HOME")
-                    .ok()
-                    .map(|h| std::path::PathBuf::from(format!("{}/.cache/ax", h)))
-                    .unwrap_or_else(|| std::path::PathBuf::from(".cache/ax"))
-            };
-
-            let pkg_cache = cache_base.join(&pkgbase);
-
-            // Read dir
-            let mut overrides = Vec::new();
-            if let Ok(entries) = std::fs::read_dir(&pkg_cache) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    let fname = path.file_name().unwrap().to_string_lossy();
-
-                    // Support multiple compression formats: .zst, .xz, .gz, and uncompressed
-                    let is_package = fname.contains(".pkg.tar.") || fname.ends_with(".pkg.tar");
-
-                    if is_package {
-                        // Filename format: name-version-arch.pkg.tar.{zst,xz,gz}
-                        // Improved matching: check exact package name with version separator
-                        let mut should_install = false;
-                        for needed in &visited {
-                            // Match pattern: "pkgname-" followed by version number
-                            // This prevents libfoo matching libfoo-extra
-                            if fname.starts_with(&format!("{}-", needed)) {
-                                // Additional verification: ensure next char after name is digit or version
-                                let after_name = &fname[needed.len() + 1..];
-                                if after_name
-                                    .chars()
-                                    .next()
-                                    .map(|c| c.is_ascii_digit())
-                                    .unwrap_or(false)
-                                {
-                                    should_install = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if should_install {
-                            overrides.push(path);
-                        }
-                    }
-                }
-            }
-
-            if !overrides.is_empty() {
+            if !package_paths.is_empty() {
                 println!(
                     ":: Installing built packages: {:?}",
-                    overrides
+                    package_paths
                         .iter()
                         .map(|p| p.file_name().unwrap())
                         .collect::<Vec<_>>()
@@ -306,7 +236,7 @@ async fn install_packages(
                     cmd.arg(flag);
                 }
 
-                for p in overrides {
+                for p in package_paths {
                     cmd.arg(p);
                 }
 
@@ -315,7 +245,7 @@ async fn install_packages(
                     anyhow::bail!("Failed to install {}", pkgbase);
                 }
             } else {
-                println!("!! No matching packages found to install for {}", pkgbase);
+                println!("!! No packages were built for {}", pkgbase);
             }
         }
     }

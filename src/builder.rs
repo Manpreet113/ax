@@ -1,12 +1,17 @@
-use crate::git_ops;
-use crate::interactive;
 use anyhow::{Context, Result};
 use colored::*;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool) -> Result<()> {
+use crate::git_ops;
+use crate::interactive;
+
+pub fn build_package(
+    pkg: &str,
+    config: &crate::config::Config,
+    show_diff: bool,
+) -> Result<Vec<PathBuf>> {
     // Resolve Cache Dir: Config > XDG > HOME
     let cache_base = if let Some(ref dir) = config.build_dir {
         std::path::PathBuf::from(dir)
@@ -89,7 +94,35 @@ pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool)
         }
     }
 
-    // 3. Clean build if requested
+    // 3. Get exact list of packages that will be built BEFORE building
+    println!(":: Determining package list...");
+    let packagelist_output = Command::new("makepkg")
+        .arg("--packagelist")
+        .current_dir(&cache_dir)
+        .output()
+        .context("Failed to run makepkg --packagelist")?;
+
+    if !packagelist_output.status.success() {
+        anyhow::bail!("makepkg --packagelist failed");
+    }
+
+    let package_files: Vec<PathBuf> = String::from_utf8_lossy(&packagelist_output.stdout)
+        .lines()
+        .map(|line| PathBuf::from(line.trim()))
+        .collect();
+
+    if package_files.is_empty() {
+        anyhow::bail!("makepkg --packagelist returned no packages");
+    }
+
+    println!(":: Will build: {}", package_files.len());
+    for pf in &package_files {
+        if let Some(fname) = pf.file_name() {
+            println!("   - {}", fname.to_string_lossy());
+        }
+    }
+
+    // 4. Clean build if requested
     if config.clean_build {
         println!("{}", ":: Cleaning build directory...".yellow());
         Command::new("git")
@@ -99,7 +132,7 @@ pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool)
             .context("Failed to clean build directory")?;
     }
 
-    // 4. Run makepkg
+    // 5. Run makepkg
     let status = Command::new("makepkg")
         .arg("-sf") // Sync deps, Force build (overwrite), DO NOT install (-i)
         .current_dir(&cache_dir)
@@ -108,7 +141,9 @@ pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool)
 
     if status.success() {
         println!(":: {} {}", pkg.green(), "built successfully!".green());
-        Ok(())
+
+        // Return the exact package files that were built
+        Ok(package_files)
     } else {
         anyhow::bail!("Failed to build {}. Aborting queue.", pkg);
     }
