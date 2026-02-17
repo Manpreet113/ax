@@ -27,9 +27,7 @@ pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool)
 
     // 1. Prompt for diff if requested (and if it's an update, which implies directory exists)
     // I hope the directory exists, otherwise this will look silly.
-    if show_diff && cache_path.exists()
-        && interactive::prompt_diff(pkg)?
-    {
+    if show_diff && cache_path.exists() && interactive::prompt_diff(pkg)? {
         match git_ops::get_diff(cache_path) {
             Ok(diff) => {
                 if diff.is_empty() {

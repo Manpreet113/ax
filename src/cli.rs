@@ -8,6 +8,7 @@ pub struct Cli {
     pub command: Option<Commands>,
 
     /// Search query
+    #[arg(trailing_var_arg = true)]
     pub query: Vec<String>,
 }
 
@@ -21,8 +22,15 @@ pub enum Commands {
         sysupgrade: bool, // -u
         #[arg(long)]
         cleanbuild: bool,
+
+        /// Packages to install
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         packages: Vec<String>,
     },
     #[command(short_flag = 'R')]
-    Remove { packages: Vec<String> },
+    Remove {
+        /// Packages to remove
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        packages: Vec<String>,
+    },
 }

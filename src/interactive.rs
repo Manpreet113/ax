@@ -88,7 +88,8 @@ fn parse_selection(input: &str, max: usize) -> Vec<usize> {
                 }
             }
         } else if let Ok(idx) = part.parse::<usize>()
-            && idx > 0 && idx <= max
+            && idx > 0
+            && idx <= max
         {
             selected.push(idx - 1);
         }

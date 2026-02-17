@@ -37,6 +37,10 @@ async fn main() -> Result<()> {
             cleanbuild,
             packages,
         }) => {
+            // Separate pacman flags from package names
+            let (pacman_flags, pkg_names): (Vec<String>, Vec<String>) =
+                packages.into_iter().partition(|arg| arg.starts_with('-'));
+
             if cleanbuild {
                 config.clean_build = true;
             }
@@ -49,11 +53,15 @@ async fn main() -> Result<()> {
                 }
 
                 println!("{}", ":: Starting system upgrade...".blue().bold());
-                let status = Command::new("sudo")
-                    .arg("pacman")
-                    .arg("-Syu")
-                    .status()
-                    .context("Failed to execute sudo pacman -Syu")?;
+                let mut cmd = Command::new("sudo");
+                cmd.arg("pacman").arg("-Syu");
+
+                // Forward user-provided pacman flags
+                for flag in &pacman_flags {
+                    cmd.arg(flag);
+                }
+
+                let status = cmd.status().context("Failed to execute sudo pacman -Syu")?;
 
                 if !status.success() {
                     anyhow::bail!("System upgrade failed");
@@ -63,21 +71,32 @@ async fn main() -> Result<()> {
                 match upgrade::check_updates(&config).await {
                     Ok(updates) => {
                         if !updates.is_empty() {
-                            install_packages(&updates, &config).await?;
+                            install_packages(&updates, &config, &pacman_flags).await?;
                         }
                     }
                     Err(e) => eprintln!("{} {:#}", "!! Upgrade check failed:".red().bold(), e),
                 }
             }
 
-            if !packages.is_empty() {
-                install_packages(&packages, &config).await?;
+            if !pkg_names.is_empty() {
+                install_packages(&pkg_names, &config, &pacman_flags).await?;
             }
         }
         Some(Commands::Remove { packages }) => {
-            if !packages.is_empty() {
+            // Separate pacman flags from package names
+            let (pacman_flags, pkg_names): (Vec<String>, Vec<String>) =
+                packages.into_iter().partition(|arg| arg.starts_with('-'));
+
+            if !pkg_names.is_empty() {
                 let mut cmd = Command::new("sudo");
-                cmd.arg("pacman").arg("-R").arg("-s").args(&packages);
+                cmd.arg("pacman").arg("-R").arg("-s");
+
+                // Forward user-provided flags
+                for flag in pacman_flags {
+                    cmd.arg(flag);
+                }
+
+                cmd.args(&pkg_names);
                 cmd.status().context("Failed to execute sudo pacman -R")?;
             }
         }
@@ -129,10 +148,14 @@ async fn search_and_install(query: &str, config: &config::Config) -> Result<()> 
 
     // Default to no cleanbuild for interactive search for now, or we could prompt?
     // For now, let's assume false because I'm too lazy to add another prompt.
-    install_packages(&packages_to_install, config).await
+    install_packages(&packages_to_install, config, &[]).await
 }
 
-async fn install_packages(packages: &[String], config: &config::Config) -> Result<()> {
+async fn install_packages(
+    packages: &[String],
+    config: &config::Config,
+    pacman_flags: &[String],
+) -> Result<()> {
     let arch_db = arch::ArchDB::new().context("Failed to initialize ALPM")?;
 
     let mut visited = Vec::new();
@@ -168,6 +191,11 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
 
         for dep in repo_queue {
             pacman_cmd.arg(dep);
+        }
+
+        // Forward user-provided pacman flags
+        for flag in pacman_flags {
+            pacman_cmd.arg(flag);
         }
 
         let status = pacman_cmd
@@ -272,6 +300,12 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
                 );
                 let mut cmd = Command::new("sudo");
                 cmd.arg("pacman").arg("-U"); // No --noconfirm: Allow interactive conflict resolution (Phase 10)
+
+                // Forward user-provided pacman flags
+                for flag in pacman_flags {
+                    cmd.arg(flag);
+                }
+
                 for p in overrides {
                     cmd.arg(p);
                 }
