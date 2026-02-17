@@ -2,7 +2,7 @@ use anyhow::Result;
 use srcinfo::Srcinfo;
 use std::path::Path;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PackageMetaData {
     pub pkgbase: String,
     #[allow(dead_code)]

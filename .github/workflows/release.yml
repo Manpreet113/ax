@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Release Binary
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm base-devel git rust
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Create release with binary
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/release/ax
+          body: |
+            ## ax ${{ github.ref_name }}
+            
+            AUR helper with DAG-based dependency resolution.
+            
+            ### Installation
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/ax -o ax
+            chmod +x ax
+            sudo mv ax /usr/local/bin/
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

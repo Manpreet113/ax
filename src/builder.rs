@@ -47,7 +47,7 @@ pub fn build_package(
                         Ok(mut pager) => {
                             if let Some(mut stdin) = pager.stdin.take() {
                                 use std::io::Write;
-                                write!(stdin, "{}", diff)?;
+                                let _ = write!(stdin, "{}", diff);
                             }
                             pager.wait()?;
                         }
@@ -72,14 +72,15 @@ pub fn build_package(
             .unwrap_or_else(|| "nano".to_string());
 
         let pkgbuild_path = cache_path.join("PKGBUILD");
-        let pkgbuild_str = pkgbuild_path.to_string_lossy();
+        // let pkgbuild_str = pkgbuild_path.to_string_lossy();
 
         // Use sh -c to allow arguments in EDITOR (e.g., "code --wait")
-        let cmd_str = format!("{} \"{}\"", editor, pkgbuild_str);
-
+        // Pass the file path as an argument to sh to prevent shell injection
         let status = Command::new("sh")
             .arg("-c")
-            .arg(&cmd_str)
+            .arg(format!("{} \"$1\"", editor))
+            .arg("--")
+            .arg(&pkgbuild_path)
             .status()
             .context(format!("Failed to open editor: {}", editor))?;
 
@@ -134,7 +135,7 @@ pub fn build_package(
 
     // 5. Run makepkg
     let status = Command::new("makepkg")
-        .arg("-sf") // Sync deps, Force build (overwrite), DO NOT install (-i)
+        .arg("-srf") // Sync deps, Remove deps, Force build (overwrite), DO NOT install (-i)
         .current_dir(&cache_dir)
         .status()
         .context("Failed to execute makepkg")?;

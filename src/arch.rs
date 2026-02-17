@@ -29,12 +29,6 @@ impl ArchDB {
         })
     }
 
-    pub fn is_installed(&self, dep_string: &str) -> bool {
-        let local_db = self.handle.localdb();
-
-        local_db.pkgs().find_satisfier(dep_string).is_some()
-    }
-
     pub fn exists_in_repo(&self, pkg_name: &str) -> bool {
         let dbs = self.handle.syncdbs();
         for db in dbs {
