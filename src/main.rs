@@ -9,6 +9,7 @@ mod builder;
 mod config;
 mod git_ops;
 mod gpg;
+mod graph;
 mod interactive;
 mod lock;
 mod news;
@@ -158,38 +159,25 @@ async fn install_packages(
 ) -> Result<()> {
     let arch_db = arch::ArchDB::new().context("Failed to initialize ALPM")?;
 
-    let mut visited = Vec::new();
-    let mut cycle_path = Vec::new();
-    let mut build_queue = Vec::new();
-    let mut repo_queue = Vec::new();
+    // NEW: Use DAG-based resolution
+    let plan = resolver::resolve_with_dag(packages, &arch_db, config).await?;
 
-    println!("{}", ":: Calculating dependency tree...".blue().bold());
-
-    for pkg in packages {
-        resolver::resolve_tree(
-            pkg,
-            &arch_db,
-            &mut visited,
-            &mut cycle_path,
-            &mut build_queue,
-            &mut repo_queue,
-            config,
-        )
-        .await?;
-    }
+    println!("\n{}", ":: Resolution complete!".green().bold());
+    println!("   Repo packages: {}", plan.repo_deps.len());
+    println!("   AUR packages: {}", plan.build_order.len());
 
     // Phase 1: Install Official Deps
-    if !repo_queue.is_empty() {
+    if !plan.repo_deps.is_empty() {
         println!(
             "\n{}",
             ":: Installing official dependencies...".yellow().bold()
         );
-        println!(":: Targets: {:?}", repo_queue);
+        println!(":: Targets: {:?}", plan.repo_deps);
 
         let mut pacman_cmd = Command::new("sudo");
         pacman_cmd.arg("pacman").arg("-S").arg("--needed");
 
-        for dep in repo_queue {
+        for dep in &plan.repo_deps {
             pacman_cmd.arg(dep);
         }
 
@@ -207,14 +195,15 @@ async fn install_packages(
         }
     }
 
-    // Phase 2: Build AUR Deps
-    if !build_queue.is_empty() {
+    // Phase 2: Build AUR Deps in topological order
+    if !plan.build_order.is_empty() {
         println!(
             "\n:: Starting AUR build process for {} packages...",
-            build_queue.len().to_string().green()
+            plan.build_order.len().to_string().green()
         );
+        println!(":: Build order: {:?}", plan.build_order);
 
-        for pkgbase in build_queue {
+        for pkgbase in plan.build_order {
             // build_package now returns the exact paths of packages to install
             loop {
                 match builder::build_package(&pkgbase, config, config.diff_viewer) {
