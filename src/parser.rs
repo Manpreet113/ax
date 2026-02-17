@@ -1,11 +1,11 @@
-use anyhow::{Context, Result};
-use std::fs::File;
-use std::io::{self, BufRead};
+use anyhow::Result;
+use srcinfo::Srcinfo;
 use std::path::Path;
 
 #[derive(Debug, Default)]
 pub struct PackageMetaData {
     pub pkgbase: String,
+    #[allow(dead_code)]
     pub version: String,
     pub depends: Vec<String>,
     pub make_depends: Vec<String>,
@@ -22,33 +22,53 @@ pub fn clean_dependency(dep: &str) -> String {
 }
 
 pub fn parse_srcinfo(path: &Path) -> Result<PackageMetaData> {
-    let file = File::open(path.join(".SRCINFO")).context("Could not open .SRCINFO")?;
-    let reader = io::BufReader::new(file);
+    let srcinfo_path = path.join(".SRCINFO");
 
-    let mut metadata = PackageMetaData::default();
+    let srcinfo = Srcinfo::from_path(&srcinfo_path)
+        .map_err(|e| anyhow::anyhow!("Failed to parse .SRCINFO at {:?}: {:?}", srcinfo_path, e))?;
 
-    for line in reader.lines() {
-        let line = line?;
-        let line = line.trim();
+    let mut metadata = PackageMetaData {
+        pkgbase: srcinfo.pkgbase().to_string(),
+        version: srcinfo.version().to_string(),
+        ..Default::default()
+    };
 
-        if line.is_empty() || line.starts_with('#') {
-            continue;
+    // Collect architectures
+    for arch in srcinfo.arch() {
+        metadata.arch.push(arch.to_string());
+    }
+
+    // Get the current system architecture
+    let current_arch = std::env::consts::ARCH;
+
+    // Collect makedepends (global + arch-specific)
+    for depends_arch in srcinfo.makedepends() {
+        // Check if this is for our arch or global
+        if depends_arch.arch().is_none() || depends_arch.arch() == Some(current_arch) {
+            for depend in depends_arch.iter() {
+                metadata.make_depends.push(depend.to_string());
+            }
         }
+    }
 
-        if let Some((key, value)) = line.split_once('=') {
-            let key = key.trim();
-            // Handle inline comments like "value # comment"
-            let value = value.split('#').next().unwrap_or("").trim().to_string();
+    // Collect validpgpkeys
+    for key in srcinfo.valid_pgp_keys() {
+        metadata.validpgpkeys.push(key.to_string());
+    }
 
-            match key {
-                "pkgbase" => metadata.pkgbase = value,
-                "pkgver" => metadata.version = value,
-                "pkgname" => metadata.pkgnames.push(value),
-                "depends" => metadata.depends.push(value),
-                "makedepends" => metadata.make_depends.push(value),
-                "validpgpkeys" => metadata.validpgpkeys.push(value),
-                "arch" => metadata.arch.push(value),
-                _ => {}
+    // Iterate through all packages (base + split packages)
+    for pkg in srcinfo.pkgs() {
+        metadata.pkgnames.push(pkg.pkgname().to_string());
+
+        // Collect package-specific depends (global + arch-specific)
+        for depends_arch in pkg.depends() {
+            if depends_arch.arch().is_none() || depends_arch.arch() == Some(current_arch) {
+                for depend in depends_arch.iter() {
+                    let depend_str = depend.to_string();
+                    if !metadata.depends.contains(&depend_str) {
+                        metadata.depends.push(depend_str);
+                    }
+                }
             }
         }
     }
