@@ -10,7 +10,7 @@ fn main() -> Result<(), Error> {
     let mut cmd = Cli::command();
 
     for shell in [Shell::Bash, Shell::Fish, Shell::Zsh] {
-        generate_to(shell, &mut cmd, "raur", &out_dir)?;
+        generate_to(shell, &mut cmd, "ax", &out_dir)?;
     }
 
     println!("cargo:rerun-if-changed=src/cli.rs");

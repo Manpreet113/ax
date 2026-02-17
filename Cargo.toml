@@ -1,10 +1,10 @@
 [package]
-name = "raur"
-version = "0.1.0"
+name = "ax"
+version = "1.0.0"
 edition = "2024"
 
 [dependencies]
-alpm = "4.0.0"
+alpm = { git = "https://github.com/archlinux/alpm.rs" }
 anyhow = "1.0.100"
 clap = { version = "4.5.23", features = ["derive"] }
 colored = "3.0.0"

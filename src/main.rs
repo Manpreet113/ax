@@ -14,13 +14,19 @@ mod upgrade;
 mod interactive;
 mod config;
 mod news;
+mod lock;
 
 mod cli;
 use cli::{Cli, Commands};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Phase 12: Single Instance Lock
+    // We bind it to a variable so it stays alive until end of main
+    let _lock = lock::Lock::acquire()?;
+
     let mut config = config::Config::load()?;
+    check_tools()?; 
     let cli = Cli::parse();
 
     match cli.command {
@@ -48,7 +54,7 @@ async fn main() -> Result<()> {
                 }
 
                 println!("{}", ":: Checking for AUR updates...".blue().bold());
-                match upgrade::check_updates().await {
+                match upgrade::check_updates(&config).await {
                     Ok(updates) => {
                         if !updates.is_empty() {
                             install_packages(&updates, &config).await?;
@@ -124,6 +130,7 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
     let arch_db = arch::ArchDB::new().context("Failed to initialize ALPM")?;
 
     let mut visited = Vec::new();
+    let mut cycle_path = Vec::new();
     let mut build_queue = Vec::new();
     let mut repo_queue = Vec::new();
 
@@ -134,8 +141,10 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
             pkg,
             &arch_db,
             &mut visited,
+            &mut cycle_path,
             &mut build_queue,
-            &mut repo_queue
+            &mut repo_queue,
+            config
         ).await?;
     }
 
@@ -162,10 +171,100 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
     if !build_queue.is_empty() {
         println!("\n:: Starting AUR build process for {} packages...", build_queue.len().to_string().green());
 
-        for pkg in build_queue {
-            builder::build_package(&pkg, config.clean_build, config.diff_viewer)?;
+        for pkgbase in build_queue {
+            builder::build_package(&pkgbase, config, config.diff_viewer)?;
+            
+            // Post-build: Identify which .pkg.tar.zst files to install.
+            // We want to install files that match:
+            // 1. The requested 'pkg' (if it was a sub-package of this base)
+            // 2. Any dependencies of requested packages that are provided by this base.
+            
+            // For now, a simple heuristic:
+            // If the user requested 'gcc-libs', and we built 'gcc', we look for 'gcc-libs-*.pkg.tar.zst'.
+            // If the user requested 'gcc', we look for 'gcc-*.pkg.tar.zst'.
+            
+            // To do this robustly, we need to know WHICH packages from this base are actually needed.
+            // Our 'repo_queue' tracks repo deps, but 'build_queue' just tracks bases.
+            // 'packages' arg contains the root requests.
+            // We might need to track "aur_deps" separately.
+            
+            // FOR PHASE 6 MVP:
+            // We will list ALL .pkg.tar.zst files in the cache dir.
+            // We will filter them: if the filename starts with any string in `visited` (which contains all resolved nodes),
+            // we install it.
+            
+            let cache_base = if let Some(ref dir) = config.build_dir {
+                std::path::PathBuf::from(dir)
+            } else if let Some(proj_dirs) = directories::ProjectDirs::from("com", "ax", "ax") {
+                proj_dirs.cache_dir().to_path_buf()
+            } else {
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                std::path::PathBuf::from(format!("{}/.cache/ax", home))
+            };
+            
+            let pkg_cache = cache_base.join(&pkgbase);
+            
+            // Read dir
+            let mut overrides = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(&pkg_cache) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if let Some(ext) = path.extension() {
+                        if ext == "zst" { // .pkg.tar.zst
+                            let fname = path.file_name().unwrap().to_string_lossy();
+                            // Check if this file corresponds to a package in `visited`.
+                            // Filename format: name-version-arch.pkg.tar.zst
+                            // Heuristic: check if fname starts with "{name}-" for any name in visited.
+                            
+                            let mut should_install = false;
+                            for needed in &visited {
+                                if fname.starts_with(&format!("{}-", needed)) {
+                                    should_install = true;
+                                    break;
+                                }
+                            }
+                            
+                            if should_install {
+                                overrides.push(path);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if !overrides.is_empty() {
+                println!(":: Installing built packages: {:?}", overrides.iter().map(|p| p.file_name().unwrap()).collect::<Vec<_>>());
+                 let mut cmd = Command::new("sudo");
+                 cmd.arg("pacman").arg("-U"); // No --noconfirm: Allow interactive conflict resolution (Phase 10)
+                 for p in overrides {
+                     cmd.arg(p);
+                 }
+                 
+                 let status = cmd.status().context("Failed to install AUR package")?;
+                 if !status.success() {
+                     anyhow::bail!("Failed to install {}", pkgbase);
+                 }
+            } else {
+                 println!("!! No matching packages found to install for {}", pkgbase);
+            }
         }
     }
 
+    Ok(())
+}
+
+fn check_tools() -> Result<()> {
+    let tools = ["git", "pacman", "makepkg"];
+    for tool in tools {
+        if Command::new("which")
+            .arg(tool)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .map(|s| !s.success())
+            .unwrap_or(true) 
+        {
+            anyhow::bail!("Required tool '{}' not found in PATH.", tool);
+        }
+    }
     Ok(())
 }

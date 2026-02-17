@@ -65,32 +65,56 @@ pub fn get_user_selection(max: usize) -> Result<Vec<usize>> {
         return Ok(vec![]);
     }
 
+    Ok(parse_selection(input, max))
+}
+
+fn parse_selection(input: &str, max: usize) -> Vec<usize> {
     let mut selected = Vec::new();
 
     for part in input.split_whitespace() {
         if part.contains('-') {
             let range: Vec<&str> = part.split('-').collect();
             if range.len() == 2 {
-                let start: usize = range[0].parse()?;
-                let end: usize = range[1].parse()?;
-                for i in start..=end {
-                    if i > 0 && i <= max {
-                        selected.push(i - 1);
+                if let (Ok(start_raw), Ok(end_raw)) = (range[0].parse::<usize>(), range[1].parse::<usize>()) {
+                    let start = std::cmp::min(start_raw, end_raw);
+                    let end = std::cmp::max(start_raw, end_raw);
+
+                    for i in start..=end {
+                        if i > 0 && i <= max {
+                            selected.push(i - 1);
+                        }
                     }
                 }
             }
         } else {
-            let idx: usize = part.parse()?;
-            if idx > 0 && idx <= max {
-                selected.push(idx - 1);
+            if let Ok(idx) = part.parse::<usize>() {
+                if idx > 0 && idx <= max {
+                    selected.push(idx - 1);
+                }
             }
         }
     }
 
     selected.sort();
     selected.dedup();
+    selected
+}
 
-    Ok(selected)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_selection() {
+        assert_eq!(parse_selection("1-3", 5), vec![0, 1, 2]);
+        assert_eq!(parse_selection("1-5", 5), vec![0, 1, 2, 3, 4]);
+        assert_eq!(parse_selection("2", 5), vec![1]);
+        assert_eq!(parse_selection("1 3 5", 5), vec![0, 2, 4]);
+        assert_eq!(parse_selection("1 99", 5), vec![0]); 
+        assert_eq!(parse_selection("5-1", 5), vec![0, 1, 2, 3, 4]); // Handles reverse 5-1 -> min(1,5)..max(1,5) -> 1..5
+        assert!(parse_selection("0", 5).is_empty());
+        assert!(parse_selection("invalid", 5).is_empty());
+    }
 }
 
 pub fn prompt_review(pkg: &str) -> Result<bool> {
@@ -110,6 +134,21 @@ pub fn prompt_review(pkg: &str) -> Result<bool> {
 
 pub fn prompt_diff(pkg: &str) -> Result<bool> {
     print!(":: View diff for {}? [Y/n] ", pkg.bold());
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let input = input.trim().to_lowercase();
+
+    if input == "y" || input == "yes" || input.is_empty() {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+pub fn prompt_continue() -> Result<bool> {
+    print!(":: Proceed with build? [Y/n] ");
     io::stdout().flush()?;
 
     let mut input = String::new();

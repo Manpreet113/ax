@@ -38,7 +38,7 @@ impl ArchDB {
     pub fn exists_in_repo(&self, pkg_name: &str) -> bool {
         let dbs = self.handle.syncdbs();
         for db in dbs {
-            if db.pkg(pkg_name).is_ok() {
+            if db.pkgs().find_satisfier(pkg_name).is_some() {
                 return true;
             }
         }

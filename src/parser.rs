@@ -10,6 +10,8 @@ pub struct PackageMetaData {
     pub depends: Vec<String>,
     pub make_depends: Vec<String>,
     pub validpgpkeys: Vec<String>,
+    pub arch: Vec<String>,
+    pub pkgnames: Vec<String>,
 }
 
 pub fn clean_dependency(dep: &str) -> String {
@@ -36,14 +38,17 @@ pub fn parse_srcinfo(path: &Path) -> Result<PackageMetaData> {
 
         if let Some((key, value)) = line.split_once('=') {
             let key = key.trim();
-            let value = value.trim().to_string();
+            // Handle inline comments like "value # comment"
+            let value = value.split('#').next().unwrap_or("").trim().to_string();
 
             match key {
                 "pkgbase" => metadata.pkgbase = value,
                 "pkgver" => metadata.version = value,
+                "pkgname" => metadata.pkgnames.push(value),
                 "depends" => metadata.depends.push(value),
                 "makedepends" => metadata.make_depends.push(value),
                 "validpgpkeys" => metadata.validpgpkeys.push(value),
+                "arch" => metadata.arch.push(value),
                 _ => {}
             }
         }

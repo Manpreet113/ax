@@ -27,7 +27,7 @@ impl Default for Config {
 
 impl Config {
     pub fn load() -> Result<Self> {
-        if let Some(proj_dirs) = ProjectDirs::from("com", "raur", "raur") {
+        if let Some(proj_dirs) = ProjectDirs::from("com", "ax", "ax") {
             let config_dir = proj_dirs.config_dir();
             let config_path = config_dir.join("config.toml");
 
@@ -42,7 +42,7 @@ impl Config {
 
     #[allow(dead_code)]
     pub fn save(&self) -> Result<()> {
-        if let Some(proj_dirs) = ProjectDirs::from("com", "raur", "raur") {
+        if let Some(proj_dirs) = ProjectDirs::from("com", "ax", "ax") {
             let config_dir = proj_dirs.config_dir();
             fs::create_dir_all(config_dir)?;
             

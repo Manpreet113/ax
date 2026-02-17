@@ -6,9 +6,18 @@ use std::process::Command;
 use crate::interactive;
 use crate::git_ops;
 
-pub fn build_package(pkg: &str, clean_build: bool, show_diff: bool) -> Result<()> {
-    let home = env::var("HOME").context("Could not find HOME directory")?;
-    let cache_dir = format!("{}/.cache/raur/{}", home, pkg);
+pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool) -> Result<()> {
+    // Resolve Cache Dir: Config > XDG > HOME
+    let cache_base = if let Some(ref dir) = config.build_dir {
+        std::path::PathBuf::from(dir)
+    } else if let Some(proj_dirs) = directories::ProjectDirs::from("com", "ax", "ax") {
+        proj_dirs.cache_dir().to_path_buf()
+    } else {
+        let home = env::var("HOME").context("Could not find HOME directory")?;
+        std::path::PathBuf::from(format!("{}/.cache/ax", home))
+    };
+    
+    let cache_dir = cache_base.join(pkg);
     let cache_path = Path::new(&cache_dir);
 
     println!(":: Building {}...", pkg.cyan());
@@ -23,17 +32,22 @@ pub fn build_package(pkg: &str, clean_build: bool, show_diff: bool) -> Result<()
                         println!(":: No git changes found.");
                     } else {
                         // Use pager for diff
-                        let mut pager = Command::new("less")
+                        match Command::new("less")
                             .arg("-R") // Raw control chars for color
                             .stdin(std::process::Stdio::piped())
-                            .spawn()
-                            .context("Failed to spawn pager")?;
-
-                        if let Some(mut stdin) = pager.stdin.take() {
-                            use std::io::Write;
-                            write!(stdin, "{}", diff)?;
+                            .spawn() {
+                            Ok(mut pager) => {
+                                if let Some(mut stdin) = pager.stdin.take() {
+                                    use std::io::Write;
+                                    write!(stdin, "{}", diff)?;
+                                }
+                                pager.wait()?;
+                            }
+                            Err(_) => {
+                                println!(":: (Pager failed, showing raw diff)");
+                                println!("{}", diff);
+                            }
                         }
-                        pager.wait()?;
                     }
                 }
                 Err(e) => println!(":: Failed to get diff: {}", e),
@@ -43,22 +57,36 @@ pub fn build_package(pkg: &str, clean_build: bool, show_diff: bool) -> Result<()
 
     // 2. Prompt for review
     if interactive::prompt_review(pkg)? {
-        let editor = env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
+        let editor = config.editor.as_deref()
+            .map(|s| s.to_string())
+            .or_else(|| env::var("EDITOR").ok())
+            .unwrap_or_else(|| "nano".to_string());
+            
         let pkgbuild_path = cache_path.join("PKGBUILD");
+        let pkgbuild_str = pkgbuild_path.to_string_lossy();
         
-        let status = Command::new(&editor)
-            .arg(&pkgbuild_path)
+        // Use sh -c to allow arguments in EDITOR (e.g., "code --wait")
+        let cmd_str = format!("{} \"{}\"", editor, pkgbuild_str);
+
+        let status = Command::new("sh")
+            .arg("-c")
+            .arg(&cmd_str)
             .status()
-            .context(format!("Failed to open {}", editor))?;
+            .context(format!("Failed to open editor: {}", editor))?;
 
         if !status.success() {
-             println!("{}", "!! Editor exited with error, aborting build.".red());
-             anyhow::bail!("Editor failed");
+             println!("{}", "!! Editor exited with error.".red());
+             anyhow::bail!("Editor failed with status: {}", status);
+        }
+
+        // Post-edit confirmation (fixes issue where editors return immediately)
+        if !crate::interactive::prompt_continue()? {
+            anyhow::bail!("Build aborted by user.");
         }
     }
 
     // 3. Clean build if requested
-    if clean_build {
+    if config.clean_build {
         println!("{}", ":: Cleaning build directory...".yellow());
         Command::new("git")
             .current_dir(&cache_dir)
@@ -69,13 +97,13 @@ pub fn build_package(pkg: &str, clean_build: bool, show_diff: bool) -> Result<()
 
     // 4. Run makepkg
     let status = Command::new("makepkg")
-        .arg("-si")
+        .arg("-sf") // Sync deps, Force build (overwrite), DO NOT install (-i)
         .current_dir(&cache_dir)
         .status()
         .context("Failed to execute makepkg")?;
 
     if status.success() {
-        println!(":: {} {}", pkg.green(), "installed successfully!".green());
+        println!(":: {} {}", pkg.green(), "built successfully!".green());
         Ok(())
     } else {
         anyhow::bail!("Failed to build {}. Aborting queue.", pkg);

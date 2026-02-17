@@ -1,9 +1,9 @@
 use std::process::{Command, Stdio};
 use colored::*;
 
-pub fn ensure_keys(keys: &[String]) {
+pub fn ensure_keys(keys: &[String]) -> anyhow::Result<()> {
     if keys.is_empty() {
-        return;
+        return Ok(());
     }
 
     println!(":: Checking {} PGP keys...", keys.len());
@@ -27,8 +27,9 @@ pub fn ensure_keys(keys: &[String]) {
                 .expect("Failed to run gpg recv-keys");
 
             if !fetch_status.success() {
-                eprintln!("!! Warning: Failed to import key {}. Build might fail.", key.red());
+                anyhow::bail!("Failed to import key {}. Build might fail.", key);
             }
         }
     }
+    Ok(())
 }

@@ -4,9 +4,8 @@ version = 4
 
 [[package]]
 name = "alpm"
-version = "4.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7af97d07874ead330d0d636e0953bfdb05973010bbf0ed996a600c283bcd05c"
+version = "5.0.2"
+source = "git+https://github.com/archlinux/alpm.rs#4f58a5d10b8102db3be6b99ab2afb162c255261d"
 dependencies = [
  "alpm-sys",
  "bitflags",
@@ -14,9 +13,8 @@ dependencies = [
 
 [[package]]
 name = "alpm-sys"
-version = "4.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b380d61cb56db2db0fc88072b77e760a107691521ac83012379d97d6d6e6f7ac"
+version = "5.0.1"
+source = "git+https://github.com/archlinux/alpm.rs#4f58a5d10b8102db3be6b99ab2afb162c255261d"
 dependencies = [
  "pkg-config",
 ]
@@ -101,6 +99,24 @@ name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+
+[[package]]
+name = "ax"
+version = "1.0.0"
+dependencies = [
+ "alpm",
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "colored",
+ "directories",
+ "git2",
+ "reqwest",
+ "rss",
+ "serde",
+ "tokio",
+ "toml",
+]
 
 [[package]]
 name = "base64"
@@ -1089,24 +1105,6 @@ name = "r-efi"
 version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
-
-[[package]]
-name = "raur"
-version = "0.1.0"
-dependencies = [
- "alpm",
- "anyhow",
- "clap",
- "clap_complete",
- "colored",
- "directories",
- "git2",
- "reqwest",
- "rss",
- "serde",
- "tokio",
- "toml",
-]
 
 [[package]]
 name = "redox_syscall"

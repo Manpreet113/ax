@@ -1,77 +1,110 @@
-# raur
+# Ax
 
-**Repo Unified Helper** - A simple AUR helper I wrote in Rust 🦀.
-
-I built this because I wanted to learn Rust and I kept breaking my system with other helpers. It supports the usual `pacman` operations and handles AUR packages reasonably well (I think).
-
-It "just works" somehow. Please don't judge the code too hard.
+Ax is a modern AUR helper and Pacman wrapper written in Rust, designed for simplicity, efficiency, and reliability. It aims to streamline package management on Arch Linux systems by seamlessly integrating official repository packages and the Arch User Repository (AUR).
 
 ## Features
 
-I added a few things that I personally find useful (and that I could figure out how to code):
-
-*   **Arch News Integration**: It checks the Arch Linux News before upgrading so I don't accidentally break my system (again). This has saved me at least twice.
-*   **Fast-ish**: It uses `libalpm` directly because spawning `pacman` for everything felt slow, and I wanted to feel like a real Rust developer.
-*   **Interactive Menu**: A simple menu to pick packages, because I can never remember if it's `google-chrome` or `google-chrome-stable`.
-*   **Safety**: Prompts to review `PKGBUILD`s and view `git diff`s. I usually just pretend to read them, but it's good to have the option.
-*   **Configurable**: I got tired of passing flags every time, so there's a config file now.
+- **Unified Interface**: Handles both official repository packages (via `pacman`) and AUR packages transparently.
+- **Safety First**:
+    - **Arch Linux News Integration**: Checks the latest Arch Linux News before performing system upgrades to prevent potential breakage.
+    - **PKGBUILD Review**: Prompts users to review `PKGBUILD` files and view `git diff`s before building.
+- **Improved Performance**: Utilizes `libalpm` directly for efficient package database queries, reducing the overhead of spawning `pacman` processes.
+- **Interactive Search**: Simple and effective interactive menu for searching and selecting packages.
+- **Configuration**: Highly configurable via a TOML configuration file to control build directories, editors, and behavior.
+- **Clean Builds**: Easy option to force clean builds for troubleshooting.
 
 ## Installation
 
-If you want to try it out (at your own risk):
+### Prerequisites
+
+Ensure you have the base development tools installed:
 
 ```bash
-git clone https://github.com/Manpreet113/raur.git
-cd raur
+sudo pacman -S --needed base-devel git
+```
+
+### Build from Source
+
+Clone the repository and install using Cargo:
+
+```bash
+git clone https://github.com/Manpreet113/ax.git
+cd ax
 cargo install --path .
 ```
 
+After installation, ensure `~/.cargo/bin` is in your `PATH`.
+
 ## Usage
 
-It mostly behaves like other helpers, so you don't have to learn new commands.
+Ax follows a syntax similar to `pacman` to minimize the learning curve.
 
-### Search & Install
+### Search and Install
+Search for a package in both official repositories and the AUR:
+
 ```bash
-raur <query>
-# Example: raur spotify
+ax <query>
+# Example: ax spotify
 ```
 
 ### Install Specific Package
+Install a specific package by name:
+
 ```bash
-raur -S <package_name>
+ax -S <package_name>
 ```
 
 ### System Upgrade
-Updates everything (Repo + AUR) and shows the news.
+Perform a full system upgrade (sync repo databases, upgrade repo packages, and upgrade AUR packages), checking for important news first:
+
 ```bash
-raur -Syu
+ax -Syu
+```
+
+### Remove Package
+Remove a package and its unused dependencies:
+
+```bash
+ax -R <package_name>
+```
+
+### Force Clean Build
+To force a clean build (remove build directory before building):
+
+```bash
+ax -S <package> --cleanbuild
 ```
 
 ## Configuration
 
-You can tweak it at `~/.config/raur/config.toml`.
+Ax can be configured via `~/.config/ax/config.toml`. The file is automatically created on first run if it doesn't exist.
 
-**My Config:**
+### Example Configuration
 
 ```toml
-# ~/.config/raur/config.toml
+# ~/.config/ax/config.toml
 
-build_dir = "/home/user/.cache/raur"
-editor = "nvim" # or nano if you're normal
+# Directory where AUR packages are built.
+# Default: $XDG_CACHE_HOME/ax or ~/.cache/ax
+build_dir = "/home/user/.cache/ax"
+
+# Editor to use for PKGBUILD reviews.
+# Default: $EDITOR or 'vi'
+editor = "nvim"
+
+# Whether to always clean the build directory before building.
+# Default: false
 clean_build = false
+
+# Whether to check and display Arch Linux News before upgrades.
+# Default: true
 show_news = true
+
+# Whether to use a diff viewer for inspecting changes.
+# Default: true
 diff_viewer = true
 ```
 
-## Might work on later
-
-Things I might add if I ever figure out how they work:
-
-*   **Parallel Downloads**: Downloading multiple packages at once (if I can stop the race conditions).
-*   **Split Packages**: Right now it builds everything, sorry.
-*   **Advanced Dependency Solving**: "Providers" are hard.
-*   **Local PKGBUILDs**: Maybe one day.
-
 ## License
 
-MIT (Do whatever you want with it)
+MIT License. See [LICENSE](LICENSE) for details.

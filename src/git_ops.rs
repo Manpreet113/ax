@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use colored::*;
 use git2::{build::RepoBuilder, FetchOptions, RemoteCallbacks};
 use std::path::Path;
@@ -21,6 +21,19 @@ pub fn clone_repo(url: &str, path: &Path) -> Result<()> {
 }
 
 pub fn pull_repo(path: &Path) -> Result<()> {
+    // 1. Verify Repo Integrity
+    let check = std::process::Command::new("git")
+        .current_dir(path)
+        .args(&["rev-parse", "--is-inside-work-tree"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
+    if check.is_err() || !check.unwrap().success() {
+        anyhow::bail!("Directory is not a valid git repository");
+    }
+
+    // 2. Pull
     // We use Command for pull because libgit2 merge logic is complex and I am simple.
     let status = std::process::Command::new("git")
         .current_dir(path)
@@ -67,7 +80,7 @@ pub fn check_vcs_update(path: &Path) -> Result<bool> {
     let parts: Vec<&str> = stdout.split_whitespace().collect();
     
     if parts.len() >= 2 {
-        let behind: usize = parts[1].parse().unwrap_or(0);
+        let behind: usize = parts[1].parse().context("Failed to parse git rev-list output")?;
         return Ok(behind > 0);
     }
 
