@@ -133,7 +133,27 @@ pub fn build_package(
             .context("Failed to clean build directory")?;
     }
 
-    // 5. Run makepkg
+    // 5. Fetch required PGP keys from .SRCINFO
+    if let Ok(metadata) = crate::parser::parse_srcinfo(&cache_path) {
+        if !metadata.validpgpkeys.is_empty() {
+            let failed_keys = crate::gpg::ensure_keys(&metadata.validpgpkeys)?;
+            if !failed_keys.is_empty() {
+                eprintln!(
+                    "{} {} PGP key(s) could not be fetched: {:?}",
+                    "!!".red().bold(),
+                    failed_keys.len(),
+                    failed_keys
+                );
+                eprintln!(
+                    "{} makepkg may fail during source verification",
+                    "!!".yellow().bold()
+                );
+                // Continue anyway - let makepkg decide if it's fatal
+            }
+        }
+    }
+
+    // 6. Run makepkg
     let status = Command::new("makepkg")
         .arg("-srf") // Sync deps, Remove deps, Force build (overwrite), DO NOT install (-i)
         .current_dir(&cache_dir)

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-02-17
+
+### Added
+- **GPG key verification**: Automatically fetch required PGP keys from keyserver before building
+  - Reads `validpgpkeys` from `.SRCINFO`
+  - Fetches missing keys from `keyserver.ubuntu.com`
+  - Prevents `makepkg` failures due to missing signature keys
+  - Fixes packages like `wlogout` that require GPG verification
+
+### Fixed
+- PGP signature verification errors during package builds
+
 ## [1.0.2] - 2026-02-17
 
 ### Fixed
