@@ -1,20 +1,20 @@
 use anyhow::{Context, Result};
-use clap::{Parser, CommandFactory};
+use clap::{CommandFactory, Parser};
 use colored::*;
 use std::process::Command;
 
 mod api;
-mod builder;
 mod arch;
+mod builder;
+mod config;
 mod git_ops;
 mod gpg;
+mod interactive;
+mod lock;
+mod news;
 mod parser;
 mod resolver;
 mod upgrade;
-mod interactive;
-mod config;
-mod news;
-mod lock;
 
 mod cli;
 use cli::{Cli, Commands};
@@ -26,20 +26,26 @@ async fn main() -> Result<()> {
     let _lock = lock::Lock::acquire()?;
 
     let mut config = config::Config::load()?;
-    check_tools()?; 
+    check_tools()?;
+    check_interactive()?;
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Sync { refresh: _, sysupgrade, cleanbuild, packages }) => {
+        Some(Commands::Sync {
+            refresh: _,
+            sysupgrade,
+            cleanbuild,
+            packages,
+        }) => {
             if cleanbuild {
                 config.clean_build = true;
             }
 
             if sysupgrade {
-                if config.show_news {
-                    if let Err(e) = news::check_news().await {
-                        eprintln!("{} {}", "!! Failed to fetch news:".red(), e);
-                    }
+                if config.show_news
+                    && let Err(e) = news::check_news().await
+                {
+                    eprintln!("{} {}", "!! Failed to fetch news:".red(), e);
                 }
 
                 println!("{}", ":: Starting system upgrade...".blue().bold());
@@ -90,7 +96,7 @@ async fn main() -> Result<()> {
 
 async fn search_and_install(query: &str, config: &config::Config) -> Result<()> {
     let arch_db = arch::ArchDB::new().context("Failed to initialize ALPM")?;
-    
+
     println!("{}", ":: Searching...".blue().bold());
 
     let repo_results = arch_db.search(query)?;
@@ -144,13 +150,17 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
             &mut cycle_path,
             &mut build_queue,
             &mut repo_queue,
-            config
-        ).await?;
+            config,
+        )
+        .await?;
     }
 
     // Phase 1: Install Official Deps
     if !repo_queue.is_empty() {
-        println!("\n{}", ":: Installing official dependencies...".yellow().bold());
+        println!(
+            "\n{}",
+            ":: Installing official dependencies...".yellow().bold()
+        );
         println!(":: Targets: {:?}", repo_queue);
 
         let mut pacman_cmd = Command::new("sudo");
@@ -160,7 +170,9 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
             pacman_cmd.arg(dep);
         }
 
-        let status = pacman_cmd.status().context("Failed to execute sudo pacman")?;
+        let status = pacman_cmd
+            .status()
+            .context("Failed to execute sudo pacman")?;
 
         if !status.success() {
             anyhow::bail!("Failed to install official dependencies. Aborting.");
@@ -169,83 +181,107 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
 
     // Phase 2: Build AUR Deps
     if !build_queue.is_empty() {
-        println!("\n:: Starting AUR build process for {} packages...", build_queue.len().to_string().green());
+        println!(
+            "\n:: Starting AUR build process for {} packages...",
+            build_queue.len().to_string().green()
+        );
 
         for pkgbase in build_queue {
             builder::build_package(&pkgbase, config, config.diff_viewer)?;
-            
+
             // Post-build: Identify which .pkg.tar.zst files to install.
             // We want to install files that match:
             // 1. The requested 'pkg' (if it was a sub-package of this base)
             // 2. Any dependencies of requested packages that are provided by this base.
-            
+
             // For now, a simple heuristic:
             // If the user requested 'gcc-libs', and we built 'gcc', we look for 'gcc-libs-*.pkg.tar.zst'.
             // If the user requested 'gcc', we look for 'gcc-*.pkg.tar.zst'.
-            
+
             // To do this robustly, we need to know WHICH packages from this base are actually needed.
             // Our 'repo_queue' tracks repo deps, but 'build_queue' just tracks bases.
             // 'packages' arg contains the root requests.
             // We might need to track "aur_deps" separately.
-            
+
             // FOR PHASE 6 MVP:
             // We will list ALL .pkg.tar.zst files in the cache dir.
             // We will filter them: if the filename starts with any string in `visited` (which contains all resolved nodes),
             // we install it.
-            
+
             let cache_base = if let Some(ref dir) = config.build_dir {
                 std::path::PathBuf::from(dir)
-            } else if let Some(proj_dirs) = directories::ProjectDirs::from("com", "ax", "ax") {
+            } else if let Some(proj_dirs) =
+                directories::ProjectDirs::from("com", "manpreet113", "ax")
+            {
                 proj_dirs.cache_dir().to_path_buf()
             } else {
-                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                std::path::PathBuf::from(format!("{}/.cache/ax", home))
+                std::env::var("HOME")
+                    .ok()
+                    .map(|h| std::path::PathBuf::from(format!("{}/.cache/ax", h)))
+                    .unwrap_or_else(|| std::path::PathBuf::from(".cache/ax"))
             };
-            
+
             let pkg_cache = cache_base.join(&pkgbase);
-            
+
             // Read dir
             let mut overrides = Vec::new();
             if let Ok(entries) = std::fs::read_dir(&pkg_cache) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if let Some(ext) = path.extension() {
-                        if ext == "zst" { // .pkg.tar.zst
-                            let fname = path.file_name().unwrap().to_string_lossy();
-                            // Check if this file corresponds to a package in `visited`.
-                            // Filename format: name-version-arch.pkg.tar.zst
-                            // Heuristic: check if fname starts with "{name}-" for any name in visited.
-                            
-                            let mut should_install = false;
-                            for needed in &visited {
-                                if fname.starts_with(&format!("{}-", needed)) {
+                    let fname = path.file_name().unwrap().to_string_lossy();
+
+                    // Support multiple compression formats: .zst, .xz, .gz, and uncompressed
+                    let is_package = fname.contains(".pkg.tar.") || fname.ends_with(".pkg.tar");
+
+                    if is_package {
+                        // Filename format: name-version-arch.pkg.tar.{zst,xz,gz}
+                        // Improved matching: check exact package name with version separator
+                        let mut should_install = false;
+                        for needed in &visited {
+                            // Match pattern: "pkgname-" followed by version number
+                            // This prevents libfoo matching libfoo-extra
+                            if fname.starts_with(&format!("{}-", needed)) {
+                                // Additional verification: ensure next char after name is digit or version
+                                let after_name = &fname[needed.len() + 1..];
+                                if after_name
+                                    .chars()
+                                    .next()
+                                    .map(|c| c.is_ascii_digit())
+                                    .unwrap_or(false)
+                                {
                                     should_install = true;
                                     break;
                                 }
                             }
-                            
-                            if should_install {
-                                overrides.push(path);
-                            }
+                        }
+
+                        if should_install {
+                            overrides.push(path);
                         }
                     }
                 }
             }
-            
+
             if !overrides.is_empty() {
-                println!(":: Installing built packages: {:?}", overrides.iter().map(|p| p.file_name().unwrap()).collect::<Vec<_>>());
-                 let mut cmd = Command::new("sudo");
-                 cmd.arg("pacman").arg("-U"); // No --noconfirm: Allow interactive conflict resolution (Phase 10)
-                 for p in overrides {
-                     cmd.arg(p);
-                 }
-                 
-                 let status = cmd.status().context("Failed to install AUR package")?;
-                 if !status.success() {
-                     anyhow::bail!("Failed to install {}", pkgbase);
-                 }
+                println!(
+                    ":: Installing built packages: {:?}",
+                    overrides
+                        .iter()
+                        .map(|p| p.file_name().unwrap())
+                        .collect::<Vec<_>>()
+                );
+                let mut cmd = Command::new("sudo");
+                cmd.arg("pacman").arg("-U"); // No --noconfirm: Allow interactive conflict resolution (Phase 10)
+                for p in overrides {
+                    cmd.arg(p);
+                }
+
+                let status = cmd.status().context("Failed to install AUR package")?;
+                if !status.success() {
+                    anyhow::bail!("Failed to install {}", pkgbase);
+                }
             } else {
-                 println!("!! No matching packages found to install for {}", pkgbase);
+                println!("!! No matching packages found to install for {}", pkgbase);
             }
         }
     }
@@ -256,15 +292,42 @@ async fn install_packages(packages: &[String], config: &config::Config) -> Resul
 fn check_tools() -> Result<()> {
     let tools = ["git", "pacman", "makepkg"];
     for tool in tools {
-        if Command::new("which")
-            .arg(tool)
+        // Use 'command -v' instead of 'which' for better reliability
+        // Works with shell aliases and is POSIX-compliant
+        let status = Command::new("sh")
+            .arg("-c")
+            .arg(format!("command -v {}", tool))
             .stdout(std::process::Stdio::null())
-            .status()
-            .map(|s| !s.success())
-            .unwrap_or(true) 
-        {
-            anyhow::bail!("Required tool '{}' not found in PATH.", tool);
+            .stderr(std::process::Stdio::null())
+            .status();
+
+        if status.map(|s| !s.success()).unwrap_or(true) {
+            anyhow::bail!(
+                "Required tool '{}' not found. Please install it:\n  sudo pacman -S {}",
+                tool,
+                match tool {
+                    "makepkg" => "base-devel",
+                    _ => tool,
+                }
+            );
         }
     }
+    Ok(())
+}
+
+fn check_interactive() -> Result<()> {
+    // Check if we're running in an interactive terminal
+    // This prevents sudo from hanging in non-interactive environments
+    use std::io::IsTerminal;
+
+    if !std::io::stdin().is_terminal() {
+        eprintln!(
+            "{}",
+            "WARNING: ax is running in a non-interactive environment.".yellow()
+        );
+        eprintln!("Sudo commands may fail or hang. Consider running in an interactive terminal.");
+        eprintln!();
+    }
+
     Ok(())
 }

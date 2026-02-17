@@ -7,10 +7,12 @@ pub async fn check_news() -> Result<()> {
     println!("{}", ":: Checking Arch Linux News...".blue().bold());
 
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(15)) // Increased from 5 to 15 seconds
+        .user_agent("ax/1.0") // Better compatibility
         .build()?;
 
-    let content = client.get("https://archlinux.org/feeds/news/")
+    let content = client
+        .get("https://archlinux.org/feeds/news/")
         .send()
         .await?
         .bytes()

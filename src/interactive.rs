@@ -1,8 +1,8 @@
 use crate::api::AurPackage;
 use crate::arch::RepoPackage;
+use anyhow::Result;
 use colored::*;
 use std::io::{self, Write};
-use anyhow::Result;
 
 pub enum SearchResult {
     Repo(RepoPackage),
@@ -74,24 +74,23 @@ fn parse_selection(input: &str, max: usize) -> Vec<usize> {
     for part in input.split_whitespace() {
         if part.contains('-') {
             let range: Vec<&str> = part.split('-').collect();
-            if range.len() == 2 {
-                if let (Ok(start_raw), Ok(end_raw)) = (range[0].parse::<usize>(), range[1].parse::<usize>()) {
-                    let start = std::cmp::min(start_raw, end_raw);
-                    let end = std::cmp::max(start_raw, end_raw);
+            if range.len() == 2
+                && let (Ok(start_raw), Ok(end_raw)) =
+                    (range[0].parse::<usize>(), range[1].parse::<usize>())
+            {
+                let start = std::cmp::min(start_raw, end_raw);
+                let end = std::cmp::max(start_raw, end_raw);
 
-                    for i in start..=end {
-                        if i > 0 && i <= max {
-                            selected.push(i - 1);
-                        }
+                for i in start..=end {
+                    if i > 0 && i <= max {
+                        selected.push(i - 1);
                     }
                 }
             }
-        } else {
-            if let Ok(idx) = part.parse::<usize>() {
-                if idx > 0 && idx <= max {
-                    selected.push(idx - 1);
-                }
-            }
+        } else if let Ok(idx) = part.parse::<usize>()
+            && idx > 0 && idx <= max
+        {
+            selected.push(idx - 1);
         }
     }
 
@@ -110,7 +109,7 @@ mod tests {
         assert_eq!(parse_selection("1-5", 5), vec![0, 1, 2, 3, 4]);
         assert_eq!(parse_selection("2", 5), vec![1]);
         assert_eq!(parse_selection("1 3 5", 5), vec![0, 2, 4]);
-        assert_eq!(parse_selection("1 99", 5), vec![0]); 
+        assert_eq!(parse_selection("1 99", 5), vec![0]);
         assert_eq!(parse_selection("5-1", 5), vec![0, 1, 2, 3, 4]); // Handles reverse 5-1 -> min(1,5)..max(1,5) -> 1..5
         assert!(parse_selection("0", 5).is_empty());
         assert!(parse_selection("invalid", 5).is_empty());

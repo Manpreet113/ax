@@ -1,10 +1,9 @@
 use alpm::{Alpm, SigLevel};
 use anyhow::{Context, Result};
-use std::sync::Arc;
-
+use std::rc::Rc;
 
 pub struct ArchDB {
-    handle: Arc<Alpm>,
+    handle: Rc<Alpm>,
 }
 
 pub struct RepoPackage {
@@ -20,12 +19,13 @@ impl ArchDB {
         let sync_dbs = vec!["core", "extra", "multilib"];
 
         for db_name in sync_dbs {
-            handle.register_syncdb(db_name, SigLevel::USE_DEFAULT)
+            handle
+                .register_syncdb(db_name, SigLevel::USE_DEFAULT)
                 .with_context(|| format!("Failed to register DB: {}", db_name))?;
         }
 
         Ok(Self {
-            handle: Arc::new(handle),
+            handle: Rc::new(handle),
         })
     }
 
@@ -48,7 +48,7 @@ impl ArchDB {
     pub fn search(&self, query: &str) -> Result<Vec<RepoPackage>> {
         let mut results = Vec::new();
         let dbs = self.handle.syncdbs();
-        
+
         for db in dbs {
             let pkgs = db.search([query].iter())?;
             for pkg in pkgs {

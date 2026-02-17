@@ -1,12 +1,14 @@
-use std::process::{Command, Stdio};
 use colored::*;
+use std::process::{Command, Stdio};
 
-pub fn ensure_keys(keys: &[String]) -> anyhow::Result<()> {
+pub fn ensure_keys(keys: &[String]) -> anyhow::Result<Vec<String>> {
     if keys.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
 
     println!(":: Checking {} PGP keys...", keys.len());
+
+    let mut failed_keys = Vec::new();
 
     for key in keys {
         let status = Command::new("gpg")
@@ -27,9 +29,15 @@ pub fn ensure_keys(keys: &[String]) -> anyhow::Result<()> {
                 .expect("Failed to run gpg recv-keys");
 
             if !fetch_status.success() {
-                anyhow::bail!("Failed to import key {}. Build might fail.", key);
+                eprintln!(
+                    "{} Failed to import key {}. Build may fail if signature verification is required.",
+                    "   WARNING:".yellow(),
+                    key
+                );
+                failed_keys.push(key.clone());
             }
         }
     }
-    Ok(())
+
+    Ok(failed_keys)
 }

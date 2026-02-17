@@ -33,10 +33,7 @@ pub async fn get_info(packages: &[String]) -> Result<Vec<AurPackage>> {
     let mut delay = 1;
 
     loop {
-        let resp = client.get(url)
-            .query(&params)
-            .send()
-            .await?;
+        let resp = client.get(url).query(&params).send().await?;
 
         if resp.status().as_u16() == 429 {
             if retries > 0 {
@@ -46,12 +43,12 @@ pub async fn get_info(packages: &[String]) -> Result<Vec<AurPackage>> {
                 delay *= 2;
                 continue;
             } else {
-                 anyhow::bail!("AUR Rate limit exceeded. Giving up.");
+                anyhow::bail!("AUR Rate limit exceeded. Giving up.");
             }
         }
 
         if !resp.status().is_success() {
-             anyhow::bail!("AUR API Request failed: {}", resp.status());
+            anyhow::bail!("AUR API Request failed: {}", resp.status());
         }
 
         let json: AurResponse = resp.json().await?;
@@ -63,10 +60,7 @@ pub async fn search(query: &str) -> Result<Vec<AurPackage>> {
     let client = reqwest::Client::new();
     let url = "https://aur.archlinux.org/rpc/?v=5&type=search";
 
-    let resp = client.get(url)
-        .query(&[("arg", query)])
-        .send()
-        .await?;
+    let resp = client.get(url).query(&[("arg", query)]).send().await?;
 
     let json: AurResponse = resp.json().await?;
     Ok(json.results)

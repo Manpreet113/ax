@@ -24,7 +24,5 @@ pub enum Commands {
         packages: Vec<String>,
     },
     #[command(short_flag = 'R')]
-    Remove {
-        packages: Vec<String>,
-    },
+    Remove { packages: Vec<String> },
 }

@@ -1,22 +1,25 @@
+use crate::git_ops;
+use crate::interactive;
 use anyhow::{Context, Result};
 use colored::*;
 use std::env;
 use std::path::Path;
 use std::process::Command;
-use crate::interactive;
-use crate::git_ops;
 
 pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool) -> Result<()> {
     // Resolve Cache Dir: Config > XDG > HOME
     let cache_base = if let Some(ref dir) = config.build_dir {
         std::path::PathBuf::from(dir)
-    } else if let Some(proj_dirs) = directories::ProjectDirs::from("com", "ax", "ax") {
+    } else if let Some(proj_dirs) = directories::ProjectDirs::from("com", "manpreet113", "ax") {
         proj_dirs.cache_dir().to_path_buf()
     } else {
-        let home = env::var("HOME").context("Could not find HOME directory")?;
-        std::path::PathBuf::from(format!("{}/.cache/ax", home))
+        // Safe fallback without unwrap
+        env::var("HOME")
+            .ok()
+            .map(|h| std::path::PathBuf::from(format!("{}/.cache/ax", h)))
+            .unwrap_or_else(|| std::path::PathBuf::from(".cache/ax"))
     };
-    
+
     let cache_dir = cache_base.join(pkg);
     let cache_path = Path::new(&cache_dir);
 
@@ -24,47 +27,50 @@ pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool)
 
     // 1. Prompt for diff if requested (and if it's an update, which implies directory exists)
     // I hope the directory exists, otherwise this will look silly.
-    if show_diff && cache_path.exists() {
-        if interactive::prompt_diff(pkg)? {
-            match git_ops::get_diff(cache_path) {
-                Ok(diff) => {
-                    if diff.is_empty() {
-                        println!(":: No git changes found.");
-                    } else {
-                        // Use pager for diff
-                        match Command::new("less")
-                            .arg("-R") // Raw control chars for color
-                            .stdin(std::process::Stdio::piped())
-                            .spawn() {
-                            Ok(mut pager) => {
-                                if let Some(mut stdin) = pager.stdin.take() {
-                                    use std::io::Write;
-                                    write!(stdin, "{}", diff)?;
-                                }
-                                pager.wait()?;
+    if show_diff && cache_path.exists()
+        && interactive::prompt_diff(pkg)?
+    {
+        match git_ops::get_diff(cache_path) {
+            Ok(diff) => {
+                if diff.is_empty() {
+                    println!(":: No git changes found.");
+                } else {
+                    // Use pager for diff
+                    match Command::new("less")
+                        .arg("-R") // Raw control chars for color
+                        .stdin(std::process::Stdio::piped())
+                        .spawn()
+                    {
+                        Ok(mut pager) => {
+                            if let Some(mut stdin) = pager.stdin.take() {
+                                use std::io::Write;
+                                write!(stdin, "{}", diff)?;
                             }
-                            Err(_) => {
-                                println!(":: (Pager failed, showing raw diff)");
-                                println!("{}", diff);
-                            }
+                            pager.wait()?;
+                        }
+                        Err(_) => {
+                            println!(":: (Pager failed, showing raw diff)");
+                            println!("{}", diff);
                         }
                     }
                 }
-                Err(e) => println!(":: Failed to get diff: {}", e),
             }
+            Err(e) => println!(":: Failed to get diff: {}", e),
         }
     }
 
     // 2. Prompt for review
     if interactive::prompt_review(pkg)? {
-        let editor = config.editor.as_deref()
+        let editor = config
+            .editor
+            .as_deref()
             .map(|s| s.to_string())
             .or_else(|| env::var("EDITOR").ok())
             .unwrap_or_else(|| "nano".to_string());
-            
+
         let pkgbuild_path = cache_path.join("PKGBUILD");
         let pkgbuild_str = pkgbuild_path.to_string_lossy();
-        
+
         // Use sh -c to allow arguments in EDITOR (e.g., "code --wait")
         let cmd_str = format!("{} \"{}\"", editor, pkgbuild_str);
 
@@ -75,8 +81,8 @@ pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool)
             .context(format!("Failed to open editor: {}", editor))?;
 
         if !status.success() {
-             println!("{}", "!! Editor exited with error.".red());
-             anyhow::bail!("Editor failed with status: {}", status);
+            println!("{}", "!! Editor exited with error.".red());
+            anyhow::bail!("Editor failed with status: {}", status);
         }
 
         // Post-edit confirmation (fixes issue where editors return immediately)
@@ -90,7 +96,7 @@ pub fn build_package(pkg: &str, config: &crate::config::Config, show_diff: bool)
         println!("{}", ":: Cleaning build directory...".yellow());
         Command::new("git")
             .current_dir(&cache_dir)
-            .args(&["clean", "-fdx"])
+            .args(["clean", "-fdx"])
             .status()
             .context("Failed to clean build directory")?;
     }

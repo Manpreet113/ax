@@ -1,54 +1,125 @@
 use anyhow::{Context, Result};
-use std::fs::File;
+use fs2::FileExt;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process;
+use sysinfo::System;
 
 pub struct Lock {
+    #[allow(dead_code)]
+    file: File,
     path: PathBuf,
 }
 
 impl Lock {
     pub fn acquire() -> Result<Self> {
-        let lock_path = std::env::temp_dir().join("ax.lock");
-
-        if lock_path.exists() {
-            let mut file = File::open(&lock_path)
-                .context("Failed to open existing lock file")?;
-            let mut pid_str = String::new();
-            file.read_to_string(&mut pid_str)?;
-
-            if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                // Check if process exists (Linux specific: /proc/<pid>)
-                let proc_path = std::path::Path::new("/proc").join(pid.to_string());
-                if proc_path.exists() {
-                    // It might be us? (Use std::process::id())
-                    if pid != process::id() {
-                        anyhow::bail!("ax is already running (PID: {})", pid);
-                    }
-                } else {
-                    // Stale lock
-                    std::fs::remove_file(&lock_path).ok();
-                }
+        // Use XDG cache directory instead of /tmp to avoid symlink attacks
+        let lock_path =
+            if let Some(proj_dirs) = directories::ProjectDirs::from("com", "manpreet113", "ax") {
+                proj_dirs.cache_dir().join("ax.lock")
             } else {
-                 // Corrupt/Empty lock
-                 std::fs::remove_file(&lock_path).ok();
-            }
+                // Fallback to user home
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                PathBuf::from(format!("{}/.cache/ax/ax.lock", home))
+            };
+
+        // Ensure parent directory exists
+        if let Some(parent) = lock_path.parent() {
+            std::fs::create_dir_all(parent)?;
         }
 
-        // Create new lock
-        let mut file = File::create(&lock_path)
-            .context("Failed to create lock file")?;
-        write!(file, "{}", process::id())?;
+        // Try to create lock file exclusively (atomic operation)
+        // This fixes the TOCTOU race condition
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock_path)
+        {
+            Ok(mut file) => {
+                // Successfully created new lock
+                let pid = process::id();
+                write!(file, "{}", pid)?;
+                file.flush()?;
 
-        Ok(Lock { path: lock_path })
+                // Lock the file to prevent other processes from reading/writing
+                file.try_lock_exclusive()
+                    .context("Failed to acquire exclusive lock")?;
+
+                Ok(Lock {
+                    file,
+                    path: lock_path,
+                })
+            }
+            Err(_) => {
+                // Lock file exists, check if it's stale
+                let file = File::open(&lock_path).context("Failed to open existing lock file")?;
+
+                let mut pid_str = String::new();
+                let mut reader = std::io::BufReader::new(file);
+                reader.read_to_string(&mut pid_str)?;
+
+                if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                    // Use sysinfo to check if process exists and verify it's actually ax
+                    // This fixes the PID recycling issue
+                    let mut sys = System::new();
+                    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+                    if let Some(process) = sys.process(sysinfo::Pid::from_u32(pid)) {
+                        // Process exists - check if it's the current process or another ax instance
+                        if pid == process::id() {
+                            // Same process (shouldn't happen, but handle gracefully)
+                            std::fs::remove_file(&lock_path)?;
+                        } else {
+                            // Verify it's actually an ax process by checking the name
+                            let proc_name = process.name().to_string_lossy().to_string();
+                            if proc_name.contains("ax") {
+                                anyhow::bail!(
+                                    "ax is already running (PID: {}, name: {})",
+                                    pid,
+                                    proc_name
+                                );
+                            } else {
+                                // Different process with recycled PID - safe to remove stale lock
+                                std::fs::remove_file(&lock_path)?;
+                            }
+                        }
+                    } else {
+                        // Process doesn't exist - stale lock
+                        std::fs::remove_file(&lock_path)?;
+                    }
+                } else {
+                    // Corrupt lock file
+                    std::fs::remove_file(&lock_path)?;
+                }
+
+                // Retry lock acquisition after cleanup
+                let mut file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&lock_path)?;
+
+                let pid = process::id();
+                write!(file, "{}", pid)?;
+                file.flush()?;
+
+                file.try_lock_exclusive()
+                    .context("Failed to acquire exclusive lock on retry")?;
+
+                Ok(Lock {
+                    file,
+                    path: lock_path,
+                })
+            }
+        }
     }
 }
 
 impl Drop for Lock {
     fn drop(&mut self) {
-        // remove_file returns Result, but we can't return it from Drop.
-        // We ignore error (e.g., if file was already deleted).
+        // Unlock and remove the lock file
+        let _ = self.file.unlock();
         let _ = std::fs::remove_file(&self.path);
     }
 }

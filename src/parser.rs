@@ -15,15 +15,14 @@ pub struct PackageMetaData {
 }
 
 pub fn clean_dependency(dep: &str) -> String {
-    if let Some(idx) = dep.find(|c| c == '>' || c == '<' || c == '=') {
+    if let Some(idx) = dep.find(['>', '<', '=']) {
         return dep[..idx].to_string();
     }
     dep.to_string()
 }
 
 pub fn parse_srcinfo(path: &Path) -> Result<PackageMetaData> {
-    let file = File::open(path.join(".SRCINFO"))
-        .context("Could not open .SRCINFO")?;
+    let file = File::open(path.join(".SRCINFO")).context("Could not open .SRCINFO")?;
     let reader = io::BufReader::new(file);
 
     let mut metadata = PackageMetaData::default();
