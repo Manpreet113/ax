@@ -216,36 +216,83 @@ async fn install_packages(
 
         for pkgbase in build_queue {
             // build_package now returns the exact paths of packages to install
-            let package_paths = builder::build_package(&pkgbase, config, config.diff_viewer)?;
+            loop {
+                match builder::build_package(&pkgbase, config, config.diff_viewer) {
+                    Ok(package_paths) => {
+                        // Install the built packages using exact paths from makepkg --packagelist
+                        if !package_paths.is_empty() {
+                            println!(
+                                ":: Installing built packages: {:?}",
+                                package_paths
+                                    .iter()
+                                    .map(|p| p.file_name().unwrap())
+                                    .collect::<Vec<_>>()
+                            );
+                            let mut cmd = Command::new("sudo");
+                            cmd.arg("pacman").arg("-U"); // No --noconfirm: Allow interactive conflict resolution (Phase 10)
 
-            // Install the built packages using exact paths from makepkg --packagelist
+                            // Forward user-provided pacman flags
+                            for flag in pacman_flags {
+                                cmd.arg(flag);
+                            }
 
-            if !package_paths.is_empty() {
-                println!(
-                    ":: Installing built packages: {:?}",
-                    package_paths
-                        .iter()
-                        .map(|p| p.file_name().unwrap())
-                        .collect::<Vec<_>>()
-                );
-                let mut cmd = Command::new("sudo");
-                cmd.arg("pacman").arg("-U"); // No --noconfirm: Allow interactive conflict resolution (Phase 10)
+                            for p in package_paths {
+                                cmd.arg(p);
+                            }
 
-                // Forward user-provided pacman flags
-                for flag in pacman_flags {
-                    cmd.arg(flag);
+                            let status = cmd.status().context("Failed to install AUR package")?;
+                            if !status.success() {
+                                eprintln!("{} Failed to install {}", "!!".red(), pkgbase);
+
+                                // Prompt for action on install failure
+                                match interactive::prompt_on_error(
+                                    &format!("Installation of {} failed", pkgbase),
+                                    false, // No retry for pacman -U failures
+                                )? {
+                                    interactive::ErrorAction::Skip => {
+                                        println!("{}", ":: Skipping package...".yellow());
+                                        break;
+                                    }
+                                    interactive::ErrorAction::Abort
+                                    | interactive::ErrorAction::Retry => {
+                                        anyhow::bail!("Aborting due to installation failure");
+                                    }
+                                }
+                            } else {
+                                break; // Success, move to next package
+                            }
+                        } else {
+                            println!("!! No packages were built for {}", pkgbase);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        // Build failed, prompt user
+                        eprintln!(
+                            "{} Build failed for {}: {:#}",
+                            "!!".red().bold(),
+                            pkgbase,
+                            e
+                        );
+
+                        match interactive::prompt_on_error(
+                            &format!("Build of {} failed", pkgbase),
+                            true, // Allow retry for build failures
+                        )? {
+                            interactive::ErrorAction::Retry => {
+                                println!("{}", ":: Retrying build...".yellow());
+                                continue; // Retry loop
+                            }
+                            interactive::ErrorAction::Skip => {
+                                println!("{}", ":: Skipping package...".yellow());
+                                break; // Skip to next package
+                            }
+                            interactive::ErrorAction::Abort => {
+                                anyhow::bail!("Aborting due to build failure");
+                            }
+                        }
+                    }
                 }
-
-                for p in package_paths {
-                    cmd.arg(p);
-                }
-
-                let status = cmd.status().context("Failed to install AUR package")?;
-                if !status.success() {
-                    anyhow::bail!("Failed to install {}", pkgbase);
-                }
-            } else {
-                println!("!! No packages were built for {}", pkgbase);
             }
         }
     }

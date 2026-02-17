@@ -15,9 +15,20 @@ pub fn resolve_tree<'a>(
     config: &'a crate::config::Config,
 ) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> {
     Box::pin(async move {
-        // Cycle detection
+        // Cycle detection - warn instead of bail
         if cycle_path.contains(&pkg.to_string()) {
-            anyhow::bail!("Circular dependency detected: {:?} -> {}", cycle_path, pkg);
+            eprintln!(
+                "{} Circular dependency detected: {:?} -> {}",
+                "!!".red().bold(),
+                cycle_path,
+                pkg
+            );
+            eprintln!(
+                "{}",
+                ":: This may cause build issues. Continuing anyway...".yellow()
+            );
+            // Break the cycle by returning early
+            return Ok(());
         }
 
         if visited.contains(&pkg.to_string()) {

@@ -161,3 +161,35 @@ pub fn prompt_continue() -> Result<bool> {
         Ok(false)
     }
 }
+
+#[derive(Debug, PartialEq)]
+pub enum ErrorAction {
+    Retry,
+    Skip,
+    Abort,
+}
+
+pub fn prompt_on_error(error_msg: &str, allow_retry: bool) -> Result<ErrorAction> {
+    eprintln!("!! Error: {}", error_msg);
+
+    if allow_retry {
+        print!(":: [R]etry, [S]kip package, or [A]bort all? [r/s/A] ");
+    } else {
+        print!(":: [S]kip package or [A]bort all? [s/A] ");
+    }
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let input = input.trim().to_lowercase();
+
+    match input.as_str() {
+        "r" | "retry" if allow_retry => Ok(ErrorAction::Retry),
+        "s" | "skip" => Ok(ErrorAction::Skip),
+        "a" | "abort" | "" => Ok(ErrorAction::Abort),
+        _ => {
+            eprintln!("!! Invalid choice, aborting.");
+            Ok(ErrorAction::Abort)
+        }
+    }
+}
