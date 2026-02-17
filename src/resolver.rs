@@ -104,6 +104,10 @@ pub async fn resolve_with_dag(
     // Add all AUR packages to graph and map pkgnames -> pkgbase
     for metadata in aur_packages.values() {
         let pkgbase = &metadata.pkgbase;
+        
+        // CRITICAL: Add node to graph first (even if no AUR deps)
+        // Without this, packages with only repo deps get 0 nodes!
+        graph.add_node(pkgbase);
 
         // Map all pkgnames to their base
         for pkgname in &metadata.pkgnames {

@@ -26,20 +26,17 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
+      - name: Extract release notes
+        id: extract_notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          # Extract the section for this version from CHANGELOG.md
+          awk "/## \[${VERSION}\]/,/## \[/" CHANGELOG.md | sed '$d' | tail -n +2 > RELEASE_NOTES.md
+          
       - name: Create release with binary
         uses: softprops/action-gh-release@v1
         with:
           files: target/release/ax
-          body: |
-            ## ax ${{ github.ref_name }}
-            
-            AUR helper with DAG-based dependency resolution.
-            
-            ### Installation
-            ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/ax -o ax
-            chmod +x ax
-            sudo mv ax /usr/local/bin/
-            ```
+          body_path: RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
