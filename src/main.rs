@@ -240,7 +240,10 @@ async fn install_packages(
 
                                 // In --noconfirm mode, abort immediately
                                 if config.no_confirm {
-                                    anyhow::bail!("Installation of {} failed (--noconfirm)", pkgbase);
+                                    anyhow::bail!(
+                                        "Installation of {} failed (--noconfirm)",
+                                        pkgbase
+                                    );
                                 }
 
                                 // Prompt for action on install failure

@@ -5,7 +5,6 @@ use std::path::Path;
 #[derive(Debug, Default, Clone)]
 pub struct PackageMetaData {
     pub pkgbase: String,
-    #[allow(dead_code)]
     pub version: String,
     pub depends: Vec<String>,
     pub make_depends: Vec<String>,

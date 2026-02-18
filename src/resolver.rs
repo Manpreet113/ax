@@ -104,7 +104,7 @@ pub async fn resolve_with_dag(
     // Add all AUR packages to graph and map pkgnames -> pkgbase
     for metadata in aur_packages.values() {
         let pkgbase = &metadata.pkgbase;
-        
+
         // CRITICAL: Add node to graph first (even if no AUR deps)
         // Without this, packages with only repo deps get 0 nodes!
         graph.add_node(pkgbase);
@@ -148,8 +148,52 @@ pub async fn resolve_with_dag(
         }
     };
 
+    // Filter out packages that are already installed and up-to-date
+    let final_build_order: Vec<String> = build_order
+        .into_iter()
+        .filter(|pkgbase| {
+            if let Some(metadata) = aur_packages.get(pkgbase) {
+                // Check if any package in the split package set is installed
+                // Usually check the main package or all of them.
+                // Simplified: Check if *all* pkgnames in this base are installed and up to date?
+                // Or just if ANY is outdated?
+                // Conservative approach: If ANY pkgname in the base is NOT installed or OUTDATED, build.
+                // If ALL represent packages are installed AND up to date, skip.
+
+                let mut all_up_to_date = true;
+                for pkgname in &metadata.pkgnames {
+                    match arch_db.get_installed_version(pkgname) {
+                        Some(ver) => {
+                            if crate::arch::ArchDB::vercmp(&ver, &metadata.version)
+                                != std::cmp::Ordering::Equal
+                            {
+                                all_up_to_date = false;
+                                break;
+                            }
+                        }
+                        None => {
+                            all_up_to_date = false;
+                            break;
+                        }
+                    }
+                }
+
+                if all_up_to_date {
+                    println!(
+                        "{} {} {}",
+                        ":: Skipping".yellow(),
+                        pkgbase.bold(),
+                        format!("(up to date: {})", metadata.version).green()
+                    );
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+
     Ok(ResolutionPlan {
         repo_deps: repo_packages.into_iter().collect(),
-        build_order,
+        build_order: final_build_order,
     })
 }

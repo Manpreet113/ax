@@ -57,6 +57,7 @@ impl Config {
         Ok(Self::default())
     }
 
+    // TODO: Implement config modification command
     #[allow(dead_code)]
     pub fn save(&self) -> Result<()> {
         if let Some(proj_dirs) = ProjectDirs::from("com", "manpreet113", "ax") {

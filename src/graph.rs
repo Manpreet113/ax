@@ -41,6 +41,9 @@ impl DependencyGraph {
             Ok(order) => Ok(order
                 .into_iter()
                 .map(|idx| self.graph[idx].clone())
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
                 .collect()),
             Err(cycle) => {
                 let cycle_node = &self.graph[cycle.node_id()];

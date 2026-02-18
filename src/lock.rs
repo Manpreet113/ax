@@ -7,7 +7,6 @@ use std::process;
 use sysinfo::System;
 
 pub struct Lock {
-    #[allow(dead_code)]
     file: File,
     path: PathBuf,
 }
