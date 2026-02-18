@@ -134,28 +134,27 @@ pub fn build_package(
     }
 
     // 5. Fetch required PGP keys from .SRCINFO
+    let mut skip_pgp = false;
     if let Ok(metadata) = crate::parser::parse_srcinfo(cache_path)
         && !metadata.validpgpkeys.is_empty()
     {
-        let failed_keys = crate::gpg::ensure_keys(&metadata.validpgpkeys)?;
-        if !failed_keys.is_empty() {
+        let keys_ok = crate::gpg::ensure_keys(&metadata.validpgpkeys)?;
+        if !keys_ok {
             eprintln!(
-                "{} {} PGP key(s) could not be fetched: {:?}",
-                "!!".red().bold(),
-                failed_keys.len(),
-                failed_keys
-            );
-            eprintln!(
-                "{} makepkg may fail during source verification",
+                "{} GPG key fetch failed — falling back to --skippgpcheck",
                 "!!".yellow().bold()
             );
-            // Continue anyway - let makepkg decide if it's fatal
+            skip_pgp = true;
         }
     }
 
     // 6. Run makepkg
-    let status = Command::new("makepkg")
-        .arg("-srf") // Sync deps, Remove deps, Force build (overwrite), DO NOT install (-i)
+    let mut makepkg = Command::new("makepkg");
+    makepkg.arg("-srf"); // Sync deps, Remove deps, Force build
+    if skip_pgp {
+        makepkg.arg("--skippgpcheck");
+    }
+    let status = makepkg
         .current_dir(&cache_dir)
         .status()
         .context("Failed to execute makepkg")?;

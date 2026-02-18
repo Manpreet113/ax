@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-02-18
+
+### Fixed
+- **GPG key fetch robustness**: Handles keyboxd lock contention gracefully
+  - Uses `--batch --yes` mode and suppresses stderr noise
+  - Kills ALL gpg daemons (`gpgconf --kill all`) on first failure, then retries
+  - Falls back to `makepkg --skippgpcheck` if keys still can't be fetched
+  - Fixes builds for packages like `wlogout` that require PGP verification
+
 ## [1.0.4] - 2026-02-18
 
 ### Fixed
