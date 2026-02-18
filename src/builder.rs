@@ -32,7 +32,7 @@ pub fn build_package(
 
     // 1. Prompt for diff if requested (and if it's an update, which implies directory exists)
     // I hope the directory exists, otherwise this will look silly.
-    if show_diff && cache_path.exists() && interactive::prompt_diff(pkg)? {
+    if show_diff && !config.no_confirm && cache_path.exists() && interactive::prompt_diff(pkg)? {
         match git_ops::get_diff(cache_path) {
             Ok(diff) => {
                 if diff.is_empty() {
@@ -62,8 +62,8 @@ pub fn build_package(
         }
     }
 
-    // 2. Prompt for review
-    if interactive::prompt_review(pkg)? {
+    // 2. Prompt for review (skip in --noconfirm mode)
+    if !config.no_confirm && interactive::prompt_review(pkg)? {
         let editor = config
             .editor
             .as_deref()
@@ -90,7 +90,7 @@ pub fn build_package(
         }
 
         // Post-edit confirmation (fixes issue where editors return immediately)
-        if !crate::interactive::prompt_continue()? {
+        if !config.no_confirm && !crate::interactive::prompt_continue()? {
             anyhow::bail!("Build aborted by user.");
         }
     }
@@ -134,22 +134,22 @@ pub fn build_package(
     }
 
     // 5. Fetch required PGP keys from .SRCINFO
-    if let Ok(metadata) = crate::parser::parse_srcinfo(&cache_path) {
-        if !metadata.validpgpkeys.is_empty() {
-            let failed_keys = crate::gpg::ensure_keys(&metadata.validpgpkeys)?;
-            if !failed_keys.is_empty() {
-                eprintln!(
-                    "{} {} PGP key(s) could not be fetched: {:?}",
-                    "!!".red().bold(),
-                    failed_keys.len(),
-                    failed_keys
-                );
-                eprintln!(
-                    "{} makepkg may fail during source verification",
-                    "!!".yellow().bold()
-                );
-                // Continue anyway - let makepkg decide if it's fatal
-            }
+    if let Ok(metadata) = crate::parser::parse_srcinfo(cache_path)
+        && !metadata.validpgpkeys.is_empty()
+    {
+        let failed_keys = crate::gpg::ensure_keys(&metadata.validpgpkeys)?;
+        if !failed_keys.is_empty() {
+            eprintln!(
+                "{} {} PGP key(s) could not be fetched: {:?}",
+                "!!".red().bold(),
+                failed_keys.len(),
+                failed_keys
+            );
+            eprintln!(
+                "{} makepkg may fail during source verification",
+                "!!".yellow().bold()
+            );
+            // Continue anyway - let makepkg decide if it's fatal
         }
     }
 

@@ -13,6 +13,8 @@ pub struct Config {
     pub clean_build: bool,
     pub show_news: bool,
     pub diff_viewer: bool,
+    #[serde(skip)]
+    pub no_confirm: bool,
 }
 
 impl Default for Config {
@@ -23,6 +25,7 @@ impl Default for Config {
             clean_build: false,
             show_news: true,
             diff_viewer: true,
+            no_confirm: false,
         }
     }
 }

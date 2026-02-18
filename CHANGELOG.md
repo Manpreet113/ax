@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-02-18
+
+### Fixed
+- **UX**: `--noconfirm` now skips all interactive prompts (diff review, PKGBUILD review, build confirmation)
+  - Previously, `--noconfirm` was only forwarded to pacman but ax's own prompts still appeared
+  - Error handlers now abort immediately instead of prompting when `--noconfirm` is set
+- Removed stray `log.txt` from repository and added to `.gitignore`
+
 ## [1.0.3] - 2026-02-17
 
 ### Added

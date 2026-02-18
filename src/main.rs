@@ -42,6 +42,11 @@ async fn main() -> Result<()> {
             let (pacman_flags, pkg_names): (Vec<String>, Vec<String>) =
                 packages.into_iter().partition(|arg| arg.starts_with('-'));
 
+            // Detect --noconfirm and propagate to config
+            if pacman_flags.iter().any(|f| f == "--noconfirm") {
+                config.no_confirm = true;
+            }
+
             if cleanbuild {
                 config.clean_build = true;
             }
@@ -233,6 +238,11 @@ async fn install_packages(
                             if !status.success() {
                                 eprintln!("{} Failed to install {}", "!!".red(), pkgbase);
 
+                                // In --noconfirm mode, abort immediately
+                                if config.no_confirm {
+                                    anyhow::bail!("Installation of {} failed (--noconfirm)", pkgbase);
+                                }
+
                                 // Prompt for action on install failure
                                 match interactive::prompt_on_error(
                                     &format!("Installation of {} failed", pkgbase),
@@ -263,6 +273,11 @@ async fn install_packages(
                             pkgbase,
                             e
                         );
+
+                        // In --noconfirm mode, abort immediately
+                        if config.no_confirm {
+                            anyhow::bail!("Build of {} failed (--noconfirm)", pkgbase);
+                        }
 
                         match interactive::prompt_on_error(
                             &format!("Build of {} failed", pkgbase),
