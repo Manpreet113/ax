@@ -1,6 +1,7 @@
 use alpm::{Alpm, SigLevel};
 use anyhow::{Context, Result};
 use std::rc::Rc;
+use std::cmp::Ordering;
 
 pub struct ArchDB {
     handle: Rc<Alpm>,
@@ -84,5 +85,13 @@ impl ArchDB {
         }
 
         Ok(foreign_pkgs)
+    }
+    pub fn get_installed_version(&self, pkg_name: &str) -> Option<String> {
+        let local_db = self.handle.localdb();
+        local_db.pkg(pkg_name).ok().map(|p| p.version().to_string())
+    }
+
+    pub fn vercmp(v1: &str, v2: &str) -> Ordering {
+        alpm::vercmp(v1, v2)
     }
 }

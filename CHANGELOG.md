@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-02-18
+
+### Changed
+- **Smart Build Skipping**: Skips building AUR packages if they are already installed and up-to-date
+  - Compares installed version against AUR metadata using `vercmp`
+  - Avoids redundant rebuilds for packages like `zen-browser-bin`, `wlogout`, etc.
+  - Significantly speeds up `ax -S` when dependencies are already satisfied
+
 ## [1.0.5] - 2026-02-18
 
 ### Fixed
