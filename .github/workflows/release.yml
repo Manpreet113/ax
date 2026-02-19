@@ -42,7 +42,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           # Extract the section for this version from CHANGELOG.md
-          awk "/## \[${VERSION}\]/,/## \[/" CHANGELOG.md | sed '$d' | tail -n +2 > RELEASE_NOTES.md
+          awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > RELEASE_NOTES.md
           
       - name: Create release with binary
         uses: softprops/action-gh-release@v1

@@ -314,10 +314,12 @@ fn check_tools() -> Result<()> {
     let tools = ["git", "pacman", "makepkg"];
     for tool in tools {
         // Use 'command -v' instead of 'which' for better reliability
-        // Works with shell aliases and is POSIX-compliant
+        // Pass tool as argument to sh -c to prevent injection
         let status = Command::new("sh")
             .arg("-c")
-            .arg(format!("command -v {}", tool))
+            .arg("command -v \"$1\"")
+            .arg("--")
+            .arg(tool)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status();

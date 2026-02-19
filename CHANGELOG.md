@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Git Operations**: Updated `pull_repo` to use `libgit2` (native library) instead of shelling out to `git pull`, improving reliability and error reporting
 
+### Security
+- **Safety**: Hardened `check_tools` against potential shell injection by passing arguments securely to `sh -c` instead of using string interpolation
+
+### Fixed
+- **Build**: Fixed type inference error in `git_ops.rs` that caused earlier build failure
+- **CI**: Fixed release notes extraction in release workflow
+
 ## [1.0.11] - 2026-02-19
 
 ### Fixed

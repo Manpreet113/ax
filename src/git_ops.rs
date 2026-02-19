@@ -31,7 +31,7 @@ pub fn pull_repo(path: &Path) -> Result<()> {
 
     // 3. Fetch
     let mut fetch_options = FetchOptions::new();
-    remote.fetch(&[], Some(&mut fetch_options), None)
+    remote.fetch(&[] as &[&str], Some(&mut fetch_options), None)
         .context("Failed to fetch from remote")?;
 
     // 4. Find FETCH_HEAD
