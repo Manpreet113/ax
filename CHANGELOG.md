@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.17] - 2026-02-19
+
+### Changed
+- **Performance**: Replaced heavy `rss` dependency with `quick-xml`, significantly reducing build size and dependency count
+
 ## [1.0.16] - 2026-02-19
 
 ### Changed
