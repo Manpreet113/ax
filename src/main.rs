@@ -217,6 +217,7 @@ async fn install_packages(
                 match builder::build_package(&pkgbase, config, config.diff_viewer) {
                     Ok(package_paths) => {
                         // Install the built packages using exact paths from makepkg --packagelist
+                        // Install the built packages using exact paths from makepkg --packagelist
                         if !package_paths.is_empty() {
                             println!(
                                 ":: Installing built packages: {:?}",
@@ -225,47 +226,55 @@ async fn install_packages(
                                     .map(|p| p.file_name().unwrap())
                                     .collect::<Vec<_>>()
                             );
-                            let mut cmd = Command::new("sudo");
-                            cmd.arg("pacman").arg("-U"); // No --noconfirm: Allow interactive conflict resolution (Phase 10)
 
-                            // Forward user-provided pacman flags
-                            for flag in pacman_flags {
-                                cmd.arg(flag);
-                            }
+                            // Retry loop for installation (Phase 10 / Item 12)
+                            loop {
+                                let mut cmd = Command::new("sudo");
+                                cmd.arg("pacman").arg("-U"); // No --noconfirm: Allow interactive conflict resolution
 
-                            for p in package_paths {
-                                cmd.arg(p);
-                            }
-
-                            let status = cmd.status().context("Failed to install AUR package")?;
-                            if !status.success() {
-                                eprintln!("{} Failed to install {}", "!!".red(), pkgbase);
-
-                                // In --noconfirm mode, abort immediately
-                                if config.no_confirm {
-                                    anyhow::bail!(
-                                        "Installation of {} failed (--noconfirm)",
-                                        pkgbase
-                                    );
+                                // Forward user-provided pacman flags
+                                for flag in pacman_flags {
+                                    cmd.arg(flag);
                                 }
 
-                                // Prompt for action on install failure
-                                match interactive::prompt_on_error(
-                                    &format!("Installation of {} failed", pkgbase),
-                                    false, // No retry for pacman -U failures
-                                )? {
-                                    interactive::ErrorAction::Skip => {
-                                        println!("{}", ":: Skipping package...".yellow());
-                                        break;
-                                    }
-                                    interactive::ErrorAction::Abort
-                                    | interactive::ErrorAction::Retry => {
-                                        anyhow::bail!("Aborting due to installation failure");
-                                    }
+                                for p in &package_paths {
+                                    cmd.arg(p);
                                 }
-                            } else {
-                                break; // Success, move to next package
+
+                                let status = cmd.status().context("Failed to install AUR package")?;
+                                if !status.success() {
+                                    eprintln!("{} Failed to install {}", "!!".red(), pkgbase);
+
+                                    // In --noconfirm mode, abort immediately
+                                    if config.no_confirm {
+                                        anyhow::bail!(
+                                            "Installation of {} failed (--noconfirm)",
+                                            pkgbase
+                                        );
+                                    }
+
+                                    // Prompt for action on install failure
+                                    match interactive::prompt_on_error(
+                                        &format!("Installation of {} failed", pkgbase),
+                                        true, // Allow retry for install failures (e.g. locked db)
+                                    )? {
+                                        interactive::ErrorAction::Retry => {
+                                            println!("{}", ":: Retrying installation...".yellow());
+                                            continue;
+                                        }
+                                        interactive::ErrorAction::Skip => {
+                                            println!("{}", ":: Skipping package...".yellow());
+                                            break; // Break install loop
+                                        }
+                                        interactive::ErrorAction::Abort => {
+                                            anyhow::bail!("Aborting due to installation failure");
+                                        }
+                                    }
+                                } else {
+                                    break; // Success, break install loop
+                                }
                             }
+                            // Move to next package in build order
                         } else {
                             println!("!! No packages were built for {}", pkgbase);
                             break;

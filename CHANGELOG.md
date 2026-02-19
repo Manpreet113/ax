@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.15] - 2026-02-19
+
+### Changed
+- **UX**: Enabled "Retry" option for installation failures (`pacman -U`), allowing users to fix issues (e.g. database locks) and retry without rebuilding
+
 ## [1.0.14] - 2026-02-19
 
 ### Fixed
