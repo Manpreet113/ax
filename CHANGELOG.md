@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.14] - 2026-02-19
+
+### Fixed
+- **Locking**: Fixed TOCTOU race condition in single-instance lock acquisition by using atomic file creation logic in retry loop, preventing race bugs when processing multiple concurrent `ax` instances
+
 ## [1.0.13] - 2026-02-19
 
 ### Changed
