@@ -12,21 +12,9 @@ pub fn build_package(
     config: &crate::config::Config,
     show_diff: bool,
 ) -> Result<Vec<PathBuf>> {
-    // Resolve Cache Dir: Config > XDG > HOME
-    let cache_base = if let Some(ref dir) = config.build_dir {
-        std::path::PathBuf::from(dir)
-    } else if let Some(proj_dirs) = directories::ProjectDirs::from("com", "manpreet113", "ax") {
-        proj_dirs.cache_dir().to_path_buf()
-    } else {
-        // Safe fallback without unwrap
-        env::var("HOME")
-            .ok()
-            .map(|h| std::path::PathBuf::from(format!("{}/.cache/ax", h)))
-            .unwrap_or_else(|| std::path::PathBuf::from(".cache/ax"))
-    };
-
-    let cache_dir = cache_base.join(pkg);
-    let cache_path = Path::new(&cache_dir);
+    let cache_base = config.get_cache_dir();
+    let cache_path = cache_base.join(pkg);
+    let cache_path = Path::new(&cache_path);
 
     println!(":: Building {}...", pkg.cyan());
 

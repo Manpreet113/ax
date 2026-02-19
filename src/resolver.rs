@@ -41,16 +41,8 @@ async fn collect_all_packages(
         // Must be in AUR - don't insert now, allow metadata parsing to drive insertion
 
         // Clone and parse PKGBUILD to get dependencies
-        let cache_base = if let Some(ref dir) = config.build_dir {
-            std::path::PathBuf::from(dir)
-        } else if let Some(proj_dirs) = directories::ProjectDirs::from("com", "manpreet113", "ax") {
-            proj_dirs.cache_dir().to_path_buf()
-        } else {
-            env::var("HOME")
-                .ok()
-                .map(|h| std::path::PathBuf::from(format!("{}/.cache/ax", h)))
-                .unwrap_or_else(|| std::path::PathBuf::from(".cache/ax"))
-        };
+        // Clone and parse PKGBUILD to get dependencies
+        let cache_base = config.get_cache_dir();
 
         let cache_path = cache_base.join(&pkg);
         if !cache_path.exists() {

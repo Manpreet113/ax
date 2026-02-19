@@ -58,6 +58,25 @@ impl Config {
     }
 
     // TODO: Implement config modification command
+    pub fn get_default_cache_dir() -> std::path::PathBuf {
+        if let Some(proj_dirs) = ProjectDirs::from("com", "manpreet113", "ax") {
+            proj_dirs.cache_dir().to_path_buf()
+        } else {
+            std::env::var("HOME")
+                .ok()
+                .map(|h| std::path::PathBuf::from(format!("{}/.cache/ax", h)))
+                .unwrap_or_else(|| std::path::PathBuf::from(".cache/ax"))
+        }
+    }
+
+    pub fn get_cache_dir(&self) -> std::path::PathBuf {
+        if let Some(ref dir) = self.build_dir {
+            std::path::PathBuf::from(dir)
+        } else {
+            Self::get_default_cache_dir()
+        }
+    }
+
     #[allow(dead_code)]
     pub fn save(&self) -> Result<()> {
         if let Some(proj_dirs) = ProjectDirs::from("com", "manpreet113", "ax") {

@@ -14,14 +14,7 @@ pub struct Lock {
 impl Lock {
     pub fn acquire() -> Result<Self> {
         // Use XDG cache directory instead of /tmp to avoid symlink attacks
-        let lock_path =
-            if let Some(proj_dirs) = directories::ProjectDirs::from("com", "manpreet113", "ax") {
-                proj_dirs.cache_dir().join("ax.lock")
-            } else {
-                // Fallback to user home
-                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                PathBuf::from(format!("{}/.cache/ax/ax.lock", home))
-            };
+        let lock_path = crate::config::Config::get_default_cache_dir().join("ax.lock");
 
         // Ensure parent directory exists
         if let Some(parent) = lock_path.parent() {
