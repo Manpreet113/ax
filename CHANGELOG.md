@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.13] - 2026-02-19
+
+### Changed
+- **API**: Implemented rate-limit retry logic for search operations (previously only available for info queries), improving reliability during heavy load
+
 ## [1.0.12] - 2026-02-19
 
 ### Changed

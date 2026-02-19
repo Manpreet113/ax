@@ -20,20 +20,16 @@ struct AurResponse {
     results: Vec<AurPackage>,
 }
 
-pub async fn get_info(packages: &[String]) -> Result<Vec<AurPackage>> {
-    if packages.is_empty() {
-        return Ok(vec![]);
-    }
-
+async fn make_request<T: serde::Serialize + ?Sized>(
+    url: &str,
+    params: &T,
+) -> Result<Vec<AurPackage>> {
     let client = reqwest::Client::new();
-    let url = "https://aur.archlinux.org/rpc/?v=5&type=info";
-    let params: Vec<(&str, &String)> = packages.iter().map(|p| ("arg[]", p)).collect();
-
     let mut retries = 3;
     let mut delay = 1;
 
     loop {
-        let resp = client.get(url).query(&params).send().await?;
+        let resp = client.get(url).query(params).send().await?;
 
         if resp.status().as_u16() == 429 {
             if retries > 0 {
@@ -56,12 +52,20 @@ pub async fn get_info(packages: &[String]) -> Result<Vec<AurPackage>> {
     }
 }
 
+pub async fn get_info(packages: &[String]) -> Result<Vec<AurPackage>> {
+    if packages.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let url = "https://aur.archlinux.org/rpc/?v=5&type=info";
+    let params: Vec<(&str, &String)> = packages.iter().map(|p| ("arg[]", p)).collect();
+
+    make_request(url, &params).await
+}
+
 pub async fn search(query: &str) -> Result<Vec<AurPackage>> {
-    let client = reqwest::Client::new();
     let url = "https://aur.archlinux.org/rpc/?v=5&type=search";
+    let params = [("arg", query)];
 
-    let resp = client.get(url).query(&[("arg", query)]).send().await?;
-
-    let json: AurResponse = resp.json().await?;
-    Ok(json.results)
+    make_request(url, &params).await
 }
