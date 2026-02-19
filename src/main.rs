@@ -28,7 +28,10 @@ async fn main() -> Result<()> {
 
     let mut config = config::Config::load()?;
     check_tools()?;
-    check_interactive()?;
+    let is_interactive = check_interactive()?;
+    if !is_interactive {
+        config.no_confirm = true;
+    }
     let cli = Cli::parse();
 
     match cli.command {
@@ -333,7 +336,7 @@ fn check_tools() -> Result<()> {
     Ok(())
 }
 
-fn check_interactive() -> Result<()> {
+fn check_interactive() -> Result<bool> {
     // Check if we're running in an interactive terminal
     // This prevents sudo from hanging in non-interactive environments
     use std::io::IsTerminal;
@@ -343,9 +346,10 @@ fn check_interactive() -> Result<()> {
             "{}",
             "WARNING: ax is running in a non-interactive environment.".yellow()
         );
-        eprintln!("Sudo commands may fail or hang. Consider running in an interactive terminal.");
+        eprintln!("Interactive prompts will be disabled (--noconfirm enabled automatically).");
         eprintln!();
+        return Ok(false);
     }
 
-    Ok(())
+    Ok(true)
 }
