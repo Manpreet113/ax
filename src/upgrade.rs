@@ -63,10 +63,12 @@ pub async fn check_updates(config: &crate::config::Config) -> Result<Vec<String>
                     update_names.push(pkg.name.clone());
                 }
             } else {
-                // Determine if we should warn about missing cache for VCS
-                // For now, let's just print a debug/warning line or maybe add a special status?
-                // "Cache missing" is hard to represent in the current Tuple return.
-                // We'll skip it for now to avoid spamming the user, but maybe we could add logic later.
+                // Warn about missing cache for VCS packages
+                println!(
+                    "{} VCS cache missing for {}, skipping update check.",
+                    "::".yellow(),
+                    pkg.name.bold()
+                );
             }
         }
     }

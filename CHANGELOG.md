@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.16] - 2026-02-19
+
+### Changed
+- **UX**: Added warning when skipping update checks for VCS packages if the cache directory is missing
+- **CI**: Fixed cache configuration in release workflow (ensuring cached dependencies are used by the containerized build)
+- **Refactor**: Removed dead legacy configuration migration code
+
 ## [1.0.15] - 2026-02-19
 
 ### Changed

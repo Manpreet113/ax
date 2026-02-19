@@ -36,17 +36,7 @@ impl Config {
             let config_dir = proj_dirs.config_dir();
             let config_path = config_dir.join("config.toml");
 
-            // Check for old config location and migrate
-            if !config_path.exists()
-                && let Some(old_dirs) = ProjectDirs::from("com", "ax", "ax")
-            {
-                let old_path = old_dirs.config_dir().join("config.toml");
-                if old_path.exists() {
-                    eprintln!(":: Migrating config from old location...");
-                    fs::create_dir_all(config_dir)?;
-                    fs::copy(&old_path, &config_path)?;
-                }
-            }
+
 
             if config_path.exists() {
                 let content = fs::read_to_string(config_path)?;
