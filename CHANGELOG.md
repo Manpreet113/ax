@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.12] - 2026-02-19
+
+### Changed
+- **Git Operations**: Updated `pull_repo` to use `libgit2` (native library) instead of shelling out to `git pull`, improving reliability and error reporting
+
 ## [1.0.11] - 2026-02-19
 
 ### Fixed

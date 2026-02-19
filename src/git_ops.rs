@@ -21,29 +21,41 @@ pub fn clone_repo(url: &str, path: &Path) -> Result<()> {
 }
 
 pub fn pull_repo(path: &Path) -> Result<()> {
-    // 1. Verify Repo Integrity
-    let check = std::process::Command::new("git")
-        .current_dir(path)
-        .args(["rev-parse", "--is-inside-work-tree"])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status();
+    // 1. Open Repository
+    let repo = git2::Repository::open(path)
+        .context("Failed to open repository")?;
 
-    if check.is_err() || !check.unwrap().success() {
-        anyhow::bail!("Directory is not a valid git repository");
-    }
+    // 2. Find Remote
+    let mut remote = repo.find_remote("origin")
+        .context("Failed to find remote 'origin'")?;
 
-    // 2. Pull
-    // We use Command for pull because libgit2 merge logic is complex and I am simple.
-    let status = std::process::Command::new("git")
-        .current_dir(path)
-        .arg("pull")
-        .output()?;
+    // 3. Fetch
+    let mut fetch_options = FetchOptions::new();
+    remote.fetch(&[], Some(&mut fetch_options), None)
+        .context("Failed to fetch from remote")?;
 
-    if status.status.success() {
+    // 4. Find FETCH_HEAD
+    let fetch_head = repo.find_reference("FETCH_HEAD")?;
+    let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
+
+    // 5. Merge Analysis
+    let (analysis, _) = repo.merge_analysis(&[&fetch_commit])?;
+
+    if analysis.is_up_to_date() {
+        return Ok(());
+    } else if analysis.is_fast_forward() {
+        // Fast-forward
+        let head = repo.head()?;
+        let refname = head.name().ok_or_else(|| anyhow::anyhow!("HEAD reference name invalid"))?;
+
+        let mut reference = repo.find_reference(refname)?;
+        reference.set_target(fetch_commit.id(), "Fast-Forward")?;
+        repo.set_head(refname)?;
+        repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
         Ok(())
     } else {
-        anyhow::bail!("Git pull failed")
+        // Diverged or conflict
+        anyhow::bail!("Repository has diverged or requires merge. Manual intervention required.")
     }
 }
 
