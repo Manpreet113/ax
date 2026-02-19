@@ -135,13 +135,15 @@ pub async fn resolve_with_dag(
                 "{}",
                 ":: Falling back to discovery order due to circular dependencies".yellow()
             );
-            // Fallback to simple ordering
-            aur_packages
+            // Fallback to simple ordering (deterministic)
+            let mut pkgs: Vec<_> = aur_packages
                 .keys()
                 .filter_map(|pkg| pkgbase_map.get(pkg).cloned())
                 .collect::<HashSet<_>>()
                 .into_iter()
-                .collect()
+                .collect();
+            pkgs.sort();
+            pkgs
         }
     };
 

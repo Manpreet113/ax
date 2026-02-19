@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-02-19
+
+### Fixed
+- **Resolver**: Use deterministic alphabetical sorting when falling back to linear build order (circular dependency handling) to ensure reproducible builds
+
 ## [1.0.10] - 2026-02-19
 
 ### Fixed
