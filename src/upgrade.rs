@@ -2,7 +2,7 @@ use crate::api;
 use crate::arch;
 use anyhow::{Context, Result};
 use colored::*;
-use std::env;
+
 
 pub async fn check_updates(config: &crate::config::Config) -> Result<Vec<String>> {
     println!("{}", ":: Searching for AUR updates...".blue().bold());

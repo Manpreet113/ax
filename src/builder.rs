@@ -13,8 +13,8 @@ pub fn build_package(
     show_diff: bool,
 ) -> Result<Vec<PathBuf>> {
     let cache_base = config.get_cache_dir();
-    let cache_path = cache_base.join(pkg);
-    let cache_path = Path::new(&cache_path);
+    let cache_dir = cache_base.join(pkg);
+    let cache_path = Path::new(&cache_dir);
 
     println!(":: Building {}...", pkg.cyan());
 

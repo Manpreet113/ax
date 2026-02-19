@@ -2,7 +2,7 @@ use crate::arch::ArchDB;
 use crate::parser::PackageMetaData;
 use anyhow::Result;
 use colored::*;
-use std::env;
+
 
 // ========== NEW: DAG-Based Batch Resolution ==========
 
@@ -94,26 +94,31 @@ pub async fn resolve_with_dag(
     let mut pkgbase_map: HashMap<String, String> = HashMap::new();
 
     // Add all AUR packages to graph and map pkgnames -> pkgbase
+    // Pass 1: Add all nodes and populate pkgbase_map
     for metadata in aur_packages.values() {
         let pkgbase = &metadata.pkgbase;
-
-        // CRITICAL: Add node to graph first (even if no AUR deps)
-        // Without this, packages with only repo deps get 0 nodes!
         graph.add_node(pkgbase);
 
-        // Map all pkgnames to their base
         for pkgname in &metadata.pkgnames {
             pkgbase_map.insert(pkgname.clone(), pkgbase.clone());
         }
+    }
 
-        // Add edges for dependencies
+    // Pass 2: Add edges for dependencies
+    for metadata in aur_packages.values() {
+        let pkgbase = &metadata.pkgbase;
         for dep in metadata.depends.iter().chain(metadata.make_depends.iter()) {
             let clean_dep = crate::parser::clean_dependency(dep);
 
             // Only add edge if dependency is an AUR package
-            if aur_packages.contains_key(&clean_dep) {
-                let dep_base = pkgbase_map.get(&clean_dep).unwrap_or(&clean_dep);
-                graph.add_edge(pkgbase, dep_base);
+            // But we must resolve the dependency name to its pkgbase if possible
+            // We check if clean_dep is in pkgbase_map, which implies it's in AUR packages we found
+            if let Some(dep_base) = pkgbase_map.get(&clean_dep) {
+                 graph.add_edge(pkgbase, dep_base);
+            } else if aur_packages.contains_key(&clean_dep) {
+                 // Fallback: if we found it in aur_packages but somehow missed mapping (shouldn't happen)
+                 // or if it's a direct match
+                 graph.add_edge(pkgbase, &clean_dep);
             }
         }
     }

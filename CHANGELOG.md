@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-02-19
+
+### Fixed
+- **Resolver**: Fixed race condition in dependency graph building where split packages could miss dependencies if processed in the wrong order. Now uses a two-pass approach (map -> connect) to ensure correct graph connectivity.
+
 ## [1.0.9] - 2026-02-19
 
 ### Fixed
