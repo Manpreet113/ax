@@ -48,6 +48,16 @@ pub fn pull_repo(path: &Path) -> Result<()> {
 }
 
 pub fn get_diff(path: &Path) -> Result<String> {
+    // 0. Fetch first to ensure FETCH_HEAD is valid
+    let fetch_status = std::process::Command::new("git")
+        .current_dir(path)
+        .arg("fetch")
+        .output()?;
+
+    if !fetch_status.status.success() {
+        return Ok("(Failed to fetch updates, cannot show diff)".to_string());
+    }
+
     // Show diff between HEAD and the upstream we just fetched
     // Usually 'git diff HEAD..FETCH_HEAD' works after a fetch
     let status = std::process::Command::new("git")

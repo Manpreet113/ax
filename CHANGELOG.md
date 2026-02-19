@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-02-19
+
+### Fixed
+- **Git Diff**: Explicitly fetches upstream before showing diff to prevent empty output on fresh clones
+- **Refactor**: Centralized cache directory resolution logic (Config > XDG > HOME) across all modules to eliminate duplication
+
 ## [1.0.8] - 2026-02-19
 
 ### Fixed
