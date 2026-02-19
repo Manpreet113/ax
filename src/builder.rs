@@ -3,6 +3,7 @@ use colored::*;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use log::debug;
 
 use crate::git_ops;
 use crate::interactive;
@@ -137,6 +138,7 @@ pub fn build_package(
     }
 
     // 6. Run makepkg
+    debug!("Starting makepkg for {}", pkg);
     let mut makepkg = Command::new("makepkg");
     makepkg.arg("-srf"); // Sync deps, Remove deps, Force build
     if skip_pgp {

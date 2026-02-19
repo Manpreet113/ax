@@ -8,6 +8,7 @@ use colored::*;
 
 use crate::graph::DependencyGraph;
 use std::collections::{HashMap, HashSet};
+use log::debug;
 
 #[derive(Debug)]
 pub struct ResolutionPlan {
@@ -34,9 +35,12 @@ async fn collect_all_packages(
 
         // Check if in repo
         if arch_db.exists_in_repo(&pkg) {
+            debug!("Found {} in official repository", pkg);
             repo_packages.insert(pkg);
             continue;
         }
+
+        debug!("{} not in repo, checking AUR", pkg);
 
         // Must be in AUR - don't insert now, allow metadata parsing to drive insertion
 
@@ -188,6 +192,7 @@ pub async fn resolve_with_dag(
                 }
 
                 if all_up_to_date {
+                    debug!("Skipping {} (up to date)", pkgbase);
                     println!(
                         "{} {} {}",
                         ":: Skipping".yellow(),

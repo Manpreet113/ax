@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.18] - 2026-02-19
+
+### Changed
+- **Architecture**: Implemented structured logging (env_logger). Run with `RUST_LOG=debug` for detailed execution logs.
+- **Code Quality**: Fixed clippy warnings (needless return statements) and updated internal logging
+
 ## [1.0.17] - 2026-02-19
 
 ### Changed

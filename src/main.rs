@@ -22,6 +22,9 @@ use cli::{Cli, Commands};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Phase 18: Structured Logging
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     // Phase 12: Single Instance Lock
     // We bind it to a variable so it stays alive until end of main
     let _lock = lock::Lock::acquire()?;

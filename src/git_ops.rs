@@ -42,7 +42,7 @@ pub fn pull_repo(path: &Path) -> Result<()> {
     let (analysis, _) = repo.merge_analysis(&[&fetch_commit])?;
 
     if analysis.is_up_to_date() {
-        return Ok(());
+        Ok(())
     } else if analysis.is_fast_forward() {
         // Fast-forward
         let head = repo.head()?;
