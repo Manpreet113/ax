@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-02-19
+
+### Fixed
+- **Critical Interaction Fix**: Auto-detects non-interactive environments (scripts, chroots) and enables `--noconfirm` automatically to prevent hangs
+- **VCS Package Resolution**: Skips version comparison for development packages (`-git`, `-hg`, etc.) to prevent incorrect rebuild loops
+- **CI/CD**: Added dependency caching to speed up builds and fixed `cargo fmt` invocation
+
 ## [1.0.7] - 2026-02-18
 
 ### Fixed

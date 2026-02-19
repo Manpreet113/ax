@@ -160,12 +160,22 @@ pub async fn resolve_with_dag(
                 // Conservative approach: If ANY pkgname in the base is NOT installed or OUTDATED, build.
                 // If ALL represent packages are installed AND up to date, skip.
 
+                let is_vcs = pkgbase.ends_with("-git")
+                    || pkgbase.ends_with("-hg")
+                    || pkgbase.ends_with("-svn")
+                    || pkgbase.ends_with("-bzr")
+                    || pkgbase.ends_with("-cvs")
+                    || pkgbase.ends_with("-darcs")
+                    || pkgbase.ends_with("-fossil");
+
                 let mut all_up_to_date = true;
                 for pkgname in &metadata.pkgnames {
                     match arch_db.get_installed_version(pkgname) {
                         Some(ver) => {
-                            if crate::arch::ArchDB::vercmp(&ver, &metadata.version)
-                                != std::cmp::Ordering::Equal
+                            // If VCS package, just being installed is enough
+                            if !is_vcs
+                                && crate::arch::ArchDB::vercmp(&ver, &metadata.version)
+                                    != std::cmp::Ordering::Equal
                             {
                                 all_up_to_date = false;
                                 break;
