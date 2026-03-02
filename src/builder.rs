@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use colored::*;
+use log::debug;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use log::debug;
 
 use crate::git_ops;
 use crate::interactive;
@@ -93,7 +93,8 @@ pub fn build_package(
         .context("Failed to run makepkg --packagelist")?;
 
     if !packagelist_output.status.success() {
-        anyhow::bail!("makepkg --packagelist failed");
+        let err = String::from_utf8_lossy(&packagelist_output.stderr);
+        anyhow::bail!("makepkg --packagelist failed:\n{}", err.trim());
     }
 
     let package_files: Vec<PathBuf> = String::from_utf8_lossy(&packagelist_output.stdout)

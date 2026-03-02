@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.19] - 2026-03-02
+
+### Fixed
+- **Error Handling**: Surfaced `makepkg --packagelist` stderr to correctly display underlying failures (like root execution restrictions) instead of swallowing them.
+
 ## [1.0.18] - 2026-02-19
 
 ### Changed
