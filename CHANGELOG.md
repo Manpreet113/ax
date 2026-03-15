@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Critical: Infinite Build Loop**: The outer retry `loop` around `build_package()` never broke on a successful build — only the inner install-retry loop had a `break`. This caused ax to repeatedly rebuild (and reinstall) the same package indefinitely. Added a `break` to exit the build retry loop after a successful build and install.
+
+### CI
+- **Workflows**: CI now also triggers on pushes and pull requests targeting the `dev` branch
+
 ## [1.0.19] - 2026-03-02
 
 ### Fixed
