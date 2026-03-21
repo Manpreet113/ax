@@ -220,7 +220,6 @@ async fn install_packages(
                 match builder::build_package(&pkgbase, config, config.diff_viewer) {
                     Ok(package_paths) => {
                         // Install the built packages using exact paths from makepkg --packagelist
-                        // Install the built packages using exact paths from makepkg --packagelist
                         if !package_paths.is_empty() {
                             println!(
                                 ":: Installing built packages: {:?}",
@@ -274,17 +273,15 @@ async fn install_packages(
                                         }
                                     }
                                 } else {
-                                    break; // Success, break install loop
+                                    break; 
                                 }
                             }
-                            // Move to next package in build order
                         } else {
                             println!("!! No packages were built for {}", pkgbase);
-                            break;
                         }
+                        break;
                     }
                     Err(e) => {
-                        // Build failed, prompt user
                         eprintln!(
                             "{} Build failed for {}: {:#}",
                             "!!".red().bold(),
@@ -292,22 +289,21 @@ async fn install_packages(
                             e
                         );
 
-                        // In --noconfirm mode, abort immediately
                         if config.no_confirm {
                             anyhow::bail!("Build of {} failed (--noconfirm)", pkgbase);
                         }
 
                         match interactive::prompt_on_error(
                             &format!("Build of {} failed", pkgbase),
-                            true, // Allow retry for build failures
+                            true, 
                         )? {
                             interactive::ErrorAction::Retry => {
                                 println!("{}", ":: Retrying build...".yellow());
-                                continue; // Retry loop
+                                continue; 
                             }
                             interactive::ErrorAction::Skip => {
                                 println!("{}", ":: Skipping package...".yellow());
-                                break; // Skip to next package
+                                break; 
                             }
                             interactive::ErrorAction::Abort => {
                                 anyhow::bail!("Aborting due to build failure");
