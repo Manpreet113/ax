@@ -58,7 +58,9 @@ async fn collect_all_packages(
 
         // Parse .SRCINFO for dependencies
         if let Ok(metadata) = crate::parser::parse_srcinfo(&cache_path) {
-            aur_packages.insert(pkg.clone(), metadata.clone());
+            // Store by pkgbase to ensure consistent lookup in Phase 3
+            aur_packages.insert(metadata.pkgbase.clone(), metadata.clone());
+            
             for dep in metadata.depends.iter().chain(metadata.make_depends.iter()) {
                 let clean_dep = crate::parser::clean_dependency(dep);
                 if !processed.contains(&clean_dep) {

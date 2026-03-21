@@ -141,7 +141,13 @@ pub fn build_package(
     // 6. Run makepkg
     debug!("Starting makepkg for {}", pkg);
     let mut makepkg = Command::new("makepkg");
-    makepkg.arg("-srf"); // Sync deps, Remove deps, Force build
+    
+    // Base flags: Sync deps, Remove deps
+    let mut flags = "-sr".to_string();
+    if config.clean_build {
+        flags.push('f'); // Force build if cleaning
+    }
+    makepkg.arg(flags);
     if skip_pgp {
         makepkg.arg("--skippgpcheck");
     }
