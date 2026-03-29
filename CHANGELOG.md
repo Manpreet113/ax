@@ -5,7 +5,7 @@ All notable changes to **ax** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.20] - 2026-03-29
 
 ### Fixed
 - **Critical: Infinite Build Loop**: The outer retry `loop` around `build_package()` never broke on a successful build — only the inner install-retry loop had a `break`. This caused ax to repeatedly rebuild (and reinstall) the same package indefinitely. Added a `break` to exit the build retry loop after a successful build and install.
