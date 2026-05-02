@@ -35,7 +35,8 @@ async fn main() -> Result<()> {
     if !is_interactive {
         config.no_confirm = true;
     }
-    let cli = Cli::parse();
+    let args = preprocess_args(std::env::args());
+    let cli = Cli::parse_from(args);
 
     match cli.command {
         Some(Commands::Sync {
@@ -109,7 +110,50 @@ async fn main() -> Result<()> {
                 }
 
                 cmd.args(&pkg_names);
-                cmd.status().context("Failed to execute sudo pacman -R")?;
+                let status = cmd.status().context("Failed to execute sudo pacman -R")?;
+                if !status.success() {
+                    std::process::exit(status.code().unwrap_or(1));
+                }
+            }
+        }
+        Some(Commands::Query { args }) => {
+            let mut cmd = Command::new("pacman");
+            cmd.arg("-Q").args(&args);
+            let status = cmd.status().context("Failed to execute pacman -Q")?;
+            if !status.success() {
+                std::process::exit(status.code().unwrap_or(1));
+            }
+        }
+        Some(Commands::Files { args }) => {
+            let mut cmd = Command::new("pacman");
+            cmd.arg("-F").args(&args);
+            let status = cmd.status().context("Failed to execute pacman -F")?;
+            if !status.success() {
+                std::process::exit(status.code().unwrap_or(1));
+            }
+        }
+        Some(Commands::Deptest { args }) => {
+            let mut cmd = Command::new("pacman");
+            cmd.arg("-T").args(&args);
+            let status = cmd.status().context("Failed to execute pacman -T")?;
+            if !status.success() {
+                std::process::exit(status.code().unwrap_or(1));
+            }
+        }
+        Some(Commands::Database { args }) => {
+            let mut cmd = Command::new("sudo");
+            cmd.arg("pacman").arg("-D").args(&args);
+            let status = cmd.status().context("Failed to execute sudo pacman -D")?;
+            if !status.success() {
+                std::process::exit(status.code().unwrap_or(1));
+            }
+        }
+        Some(Commands::Upgrade { args }) => {
+            let mut cmd = Command::new("sudo");
+            cmd.arg("pacman").arg("-U").args(&args);
+            let status = cmd.status().context("Failed to execute sudo pacman -U")?;
+            if !status.success() {
+                std::process::exit(status.code().unwrap_or(1));
             }
         }
         None => {
@@ -362,4 +406,36 @@ fn check_interactive() -> Result<bool> {
     }
 
     Ok(true)
+}
+
+fn preprocess_args(args: impl Iterator<Item = String>) -> Vec<String> {
+    let mut new_args = Vec::new();
+    let mut args_iter = args.into_iter();
+
+    // Push the program name
+    if let Some(arg) = args_iter.next() {
+        new_args.push(arg);
+    }
+
+    // Check the first argument after the program name
+    if let Some(arg) = args_iter.next() {
+        // If it looks like a bundled short flag (e.g. -Syu, -Qs, -Scc)
+        if arg.starts_with('-') && !arg.starts_with("--") && arg.len() > 2 {
+            let cmd = arg.chars().nth(1).unwrap();
+            // Check if the first character matches a known command
+            if matches!(cmd, 'S' | 'R' | 'Q' | 'D' | 'F' | 'T' | 'U') {
+                new_args.push(format!("-{}", cmd));
+                new_args.push(format!("-{}", &arg[2..]));
+            } else {
+                new_args.push(arg);
+            }
+        } else {
+            new_args.push(arg);
+        }
+    }
+
+    // Push the rest of the arguments
+    new_args.extend(args_iter);
+
+    new_args
 }

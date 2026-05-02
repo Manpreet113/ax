@@ -5,6 +5,16 @@ All notable changes to **ax** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-05-02
+
+### Added
+- **Feature Complete CLI**: `ax` now supports all standard `pacman` commands and transparently passes flags down to `pacman`. Added commands include `-Q` (Query), `-F` (Files), `-D` (Database), `-T` (Deptest), and `-U` (Upgrade).
+- **Smart Flag Preprocessing**: Automatically intercepts bundled `pacman` flags like `-Syu`, `-Qs`, or `-Scc` and translates them for internal CLI parsing, making the CLI feel indistinguishable from `pacman` or `yay`.
+
+### Changed
+- **Exit Status Propagation**: Replaced simple error bailing with proper non-zero exit code propagation from `pacman` invocations to improve scriptability.
+- **Help Documentation**: Updated the CLI help description to reflect its status as a complete pacman wrapper.
+
 ## [1.0.20] - 2026-03-29
 
 ### Fixed

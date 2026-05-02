@@ -37,7 +37,7 @@ After installation, ensure `~/.cargo/bin` is in your `PATH`.
 
 ## Usage
 
-Ax follows a syntax similar to `pacman` to minimize the learning curve.
+Ax follows a syntax similar to `pacman` to minimize the learning curve. In fact, it supports all standard `pacman` commands and transparently forwards them.
 
 ### Search and Install
 Search for a package in both official repositories and the AUR:
@@ -68,8 +68,31 @@ Remove a package and its unused dependencies:
 ax -R <package_name>
 ```
 
+### Query Local Packages
+List installed packages or search the local database:
+
+```bash
+ax -Q
+ax -Qs <query>
+```
+
+### Upgrade from Local File
+Install a local package archive:
+
+```bash
+ax -U /path/to/package.pkg.tar.zst
+```
+
+### Files Database and Other Commands
+All other `pacman` commands like Database (`-D`), Files (`-F`), and Deptest (`-T`) are also supported and passed through transparently:
+
+```bash
+ax -F <file_name>
+ax -D --asexplicit <package_name>
+```
+
 ### Force Clean Build
-To force a clean build (remove build directory before building):
+To force a clean build (remove build directory before building AUR packages):
 
 ```bash
 ax -S <package> --cleanbuild
