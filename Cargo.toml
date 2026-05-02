@@ -2,6 +2,12 @@
 name = "ax"
 version = "1.1.0"
 edition = "2024"
+description = "A fast, unified, and feature-complete wrapper for pacman and the AUR."
+license = "MIT"
+repository = "https://github.com/Manpreet113/ax"
+readme = "README.md"
+keywords = ["archlinux", "aur", "pacman", "wrapper", "alpm"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 anyhow = "1.0.100"
@@ -20,7 +26,7 @@ fs2 = "0.4.3"
 sysinfo = "0.38.2"
 srcinfo = "2.1.0"
 petgraph = "0.8.3"
-alpm = { git = "https://github.com/archlinux/alpm.rs" }
+alpm = "5.0.2"
 [build-dependencies]
 clap = { version = "4.5.23", features = ["derive"] }
 clap_complete = "4.5"
