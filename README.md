@@ -15,15 +15,32 @@ Ax is a modern AUR helper and Pacman wrapper written in Rust, designed for simpl
 
 ## Installation
 
-### Prerequisites
+### Arch User Repository (Recommended)
+
+You can easily install `ax` from the AUR using your favorite helper (or `makepkg`):
+
+```bash
+yay -S ax-bin
+# or
+yay -S ax-git
+```
+
+### Crates.io
+
+You can also install the binary via Cargo:
+
+```bash
+cargo install axpm
+```
+Note: Ensure `~/.cargo/bin` is in your `PATH`.
+
+### Build from Source
 
 Ensure you have the base development tools installed:
 
 ```bash
 sudo pacman -S --needed base-devel git
 ```
-
-### Build from Source
 
 Clone the repository and install using Cargo:
 
@@ -32,8 +49,6 @@ git clone https://github.com/Manpreet113/ax.git
 cd ax
 cargo install --path .
 ```
-
-After installation, ensure `~/.cargo/bin` is in your `PATH`.
 
 ## Usage
 
